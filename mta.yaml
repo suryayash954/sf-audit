@@ -57,7 +57,7 @@ resources:
       service-plan: application
       path: ./xs-security.json
       config:
-        xsappname: sf-permission-audit-${org}-${space}
+        xsappname: sfpermissionaudit
         tenant-mode: dedicated
         oauth2-configuration:
           credential-types:

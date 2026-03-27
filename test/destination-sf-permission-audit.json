@@ -1,0 +1,18 @@
+{
+    "exportTime": "2026-03-27 13:20:02.877859439",
+    "destination": {
+        "Name": "sf-permission-audit",
+        "Type": "HTTP",
+        "Description": "Successfactor RBP Audit",
+        "URL": "https://7a54fbc0trial-dev-sf-permission-audit-srv.cfapps.us10-001.hana.ondemand.com/",
+        "ProxyType": "Internet",
+        "Authentication": "OAuth2ClientCredentials",
+        "clientId": "sb-sfpermissionaudit!t620035",
+        "tokenServiceURL": "https://7a54fbc0trial.authentication.us10.hana.ondemand.com/oauth/token",
+        "tokenServiceURLType": "Dedicated",
+        "HTML5.DynamicDestination": "true",
+        "WebIDEUsage": "odata_gen",
+        "clientSecret": "15e7f82b-d8b8-476c-a15f-dc50bc0e4add$EBQiXullSFEsELFG_ccCxiJMYT0YWwamzZ7QsgTiTQk=",
+        "WebIDEEnabled": "true"
+    }
+}

@@ -1,6 +1,6 @@
 const axios = require('axios');
 const cds = require('@sap/cds');
-const constants = require('../lib/constants');
+const constants = require('./lib/constants');
 const { retrieveJwt, getDestination } = require('@sap-cloud-sdk/connectivity');
 
 /** 

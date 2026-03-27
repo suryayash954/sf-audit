@@ -3,7 +3,7 @@ using { sap.sf.audit as db } from '../db/schema';
 /**
  * Audit Service - Exposes all audit data via OData v4
  */
-service AuditService @(path: '/odata/v4/audit') {
+service AuditService @(path: '/SuccessFactorRBPAudit') {
     
     // Read-only views for reporting
     @readonly entity AuditHeaders              as projection on db.AuditHeaders;
@@ -42,7 +42,7 @@ service AuditService @(path: '/odata/v4/audit') {
 /**
  * Admin Service - For managing audit runs
  */
-service AdminService @(path: '/odata/v4/admin') {
+service AdminService @(path: '/SuccessFactorRBPAdmin') {
     
     @requires: 'authenticated-user'
     entity AuditHeaders as projection on db.AuditHeaders;
