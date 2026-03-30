@@ -1,5 +1,3 @@
-// srv/audit-reporting-service.cds
-
 using { sap.sf.audit as db } from '../db/schema';
 
 /**
@@ -8,65 +6,22 @@ using { sap.sf.audit as db } from '../db/schema';
  */
 service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     
-    // ============================================
     // Core Entities - Read-only for reporting
-    // ============================================
-    
-    /**
-     * Groups with member counts
-     */
     entity Groups as projection on db.Groups;
-    
-    /**
-     * Users with job and org data
-     */
     entity Users as projection on db.Users;
-    
-    /**
-     * Roles with target populations
-     */
     entity Roles as projection on db.Roles;
-    
-    /**
-     * Group memberships
-     */
     entity GroupMembers as projection on db.GroupMembers;
-    
-    /**
-     * User-role assignments
-     */
     entity UserRoleMappings as projection on db.UserRoleMappings;
-    
-    /**
-     * Multi-group users risk analysis
-     */
     entity MultiGroupUsers as projection on db.MultiGroupUsers;
-    
-    /**
-     * Inactive users with access
-     */
     entity InactiveUserAccess as projection on db.InactiveUserAccess;
-    
-    /**
-     * Unused roles
-     */
     entity UnusedRoles as projection on db.UnusedRoles;
-    
-    /**
-     * Executive summary metrics
-     */
     entity ExecutiveSummary as projection on db.ExecutiveSummary;
     
     // ============================================
     // Dashboard & Summary Functions
     // ============================================
     
-    /**
-     * Get comprehensive risk dashboard for an audit run - Working
-     */
-    function getRiskDashboard(
-        auditRunID: UUID
-    ) returns {
+    function getRiskDashboard(auditRunID: UUID) returns {
         auditInfo: {
             name: String(255);
             instance: String(20);
@@ -91,12 +46,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    /**
-     * Get executive summary for audit run - Not Implemented
-     */
-    function getExecutiveSummary(
-        auditRunID: UUID
-    ) returns {
+    function getExecutiveSummary(auditRunID: UUID) returns {
         auditInfo: {
             name: String(255);
             instance: String(20);
@@ -132,9 +82,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     // Group Analysis Functions
     // ============================================
     
-    /**
-     * Get detailed group information with metrics - Working
-     */
     function getGroupDetails(
         auditRunID: UUID,
         groupType: String(20) default null,
@@ -145,7 +92,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         groupID: String(50);
         groupName: String(255);
         groupType: String(50);
-        groupTypeInternal: String(50);
         totalMemberCount: Integer;
         activeMemberCount: Integer;
         actualMemberCount: Integer;
@@ -154,12 +100,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         lastModifiedDate: Timestamp;
     };
     
-    /**
-     * Get group size distribution analysis - not Implemented
-     */
-    function getGroupSizeAnalysis(
-        auditRunID: UUID
-    ) returns {
+    function getGroupSizeAnalysis(auditRunID: UUID) returns {
         distribution: array of {
             sizeRange: String(50);
             groupCount: Integer;
@@ -189,9 +130,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     // User Analysis Functions
     // ============================================
     
-    /**
-     * Get detailed user information with access metrics - not implemented
-     */
     function getUserDetails(
         auditRunID: UUID,
         status: String(20) default null,
@@ -216,9 +154,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         riskLevel: String(20);
     };
     
-    /**
-     * Get user access analysis - users with most permissions
-     */
     function getUserAccessAnalysis(
         auditRunID: UUID,
         top: Integer default 20
@@ -246,9 +181,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    /**
-     * Get high-risk users report - Not Implemented
-     */
     function getHighRiskUsers(
         auditRunID: UUID,
         minRiskScore: Integer default 5,
@@ -270,9 +202,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         isInactive: Boolean;
     };
     
-    /**
-     * Get inactive users with access report - Not Implemented
-     */
     function getInactiveUsersWithAccess(
         auditRunID: UUID,
         riskCategory: String(20) default null,
@@ -296,9 +225,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     // Role Analysis Functions
     // ============================================
     
-    /**
-     * Get detailed role information with assignment metrics - Not Implemented
-     */
     function getRoleDetails(
         auditRunID: UUID,
         usageStatus: String(20) default null,
@@ -317,12 +243,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         usageStatus: String(20);
     };
     
-    /**
-     * Get role coverage analysis
-     */
-    function getRoleCoverageAnalysis(
-        auditRunID: UUID
-    ) returns {
+    function getRoleCoverageAnalysis(auditRunID: UUID) returns {
         summary: {
             totalRoles: Integer;
             rolesWithTargets: Integer;
@@ -350,9 +271,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    /**
-     * Get group-role matrix - Not Implemented
-     */
     function getGroupRoleMatrix(
         auditRunID: UUID,
         top: Integer default 100,
@@ -371,9 +289,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     // User-Role Mapping Functions
     // ============================================
     
-    /**
-     * Get user-role matrix for access review - Not Implemented
-     */
     function getUserRoleMatrix(
         auditRunID: UUID,
         userName: String(255) default null,
@@ -393,9 +308,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         assignedViaGroup: String(255);
     };
     
-    /**
-     * Get users by role for access review - Not Implemented
-     */
     function getUsersByRole(
         auditRunID: UUID,
         roleId: String(100),
@@ -411,9 +323,6 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         assignedViaGroup: String(255);
     };
     
-    /**
-     * Get roles by user for access review - Not Implemented
-     */
     function getRolesByUser(
         auditRunID: UUID,
         userName: String(255),
@@ -427,23 +336,17 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     };
     
     // ============================================
-    // Export Functions 
+    // Export Functions
     // ============================================
     
-    /**
-     * Export complete audit data as JSON - Not Implemented
-     */
     function exportAuditData(
         auditRunID: UUID,
         format: String(20) default 'JSON'
     ) returns LargeBinary;
     
-    /**
-     * Export specific report as CSV - Not Implemented
-     */
     function exportReport(
         auditRunID: UUID,
-        reportType: String(50), // groups, users, roles, risk, matrix
+        reportType: String(50),
         format: String(20) default 'CSV'
     ) returns LargeBinary;
 }

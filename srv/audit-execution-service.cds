@@ -1,8 +1,8 @@
-// srv/audit-execution-service.cds
 using { sap.sf.audit as db } from '../db/schema';
 
 /**
  * Audit Execution Service
+ * Handles audit runs, user sync, and data extraction from SuccessFactors
  */
 service AuditExecutionService @(path: '/SuccessFactorRBPAudit') {
   
@@ -78,7 +78,7 @@ service AuditExecutionService @(path: '/SuccessFactorRBPAudit') {
     message: String(255);
   };
   
-  function listAuditRuns(
+  action listAuditRuns(
     status: String(20) default null,
     top: Integer default 50,
     skip: Integer default 0
