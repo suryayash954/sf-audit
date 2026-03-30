@@ -25,8 +25,16 @@ modules:
           srv-url: ${default-url}
     requires:
       - name: sf-permission-audit-auth
-      - name: sf-permission-audit-connectivity
+      - name: sf-permission-audit-db
       - name: sf-permission-audit-destination
+
+  - name: sf-permission-audit-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: sf-permission-audit-db
   - name: sf-permission-audit
     type: approuter.nodejs
     path: app/router
@@ -57,7 +65,7 @@ resources:
       service-plan: application
       path: ./xs-security.json
       config:
-        xsappname: sfpermissionaudit
+        xsappname: sf-permission-audit-${org}-${space}
         tenant-mode: dedicated
         oauth2-configuration:
           credential-types:
@@ -67,11 +75,11 @@ resources:
             - https://*~{app-api/app-uri}/**
     requires:
       - name: app-api
-  - name: sf-permission-audit-connectivity
-    type: org.cloudfoundry.managed-service
+  - name: sf-permission-audit-db
+    type: com.sap.xs.hdi-container
     parameters:
-      service: connectivity
-      service-plan: lite
+      service: hana
+      service-plan: hdi-shared
   - name: sf-permission-audit-destination
     type: org.cloudfoundry.managed-service
     parameters:

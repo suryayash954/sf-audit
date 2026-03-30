@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "description": "A simple CAP project.",
   "dependencies": {
-    "@sap/cds": "^9",
-    "express": "^4",
-    "@sap/xssec": "^4",
     "@sap-cloud-sdk/connectivity": "^4.5.1",
     "@sap-cloud-sdk/http-client": "^4.5.1",
     "@sap/audit-logging": "^7.0.0",
+    "@sap/cds": "^9",
+    "@sap/xssec": "^4",
     "axios": "^1.13.6",
     "dotenv": "^17.3.1",
     "excel4node": "^1.8.2",
+    "express": "^4",
+    "https": "^1.0.0",
     "p-limit": "^4.0.0",
-    "passport": "^0.7.0"
+    "passport": "^0.7.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@cap-js/sqlite": "^2",
@@ -25,6 +27,12 @@
   "private": true,
   "cds": {
     "requires": {
+      "db":{
+        "kind":"sqlite",
+        "credentials": {
+          "url": "db.sqlite"
+        }
+      },
       "auth": "xsuaa",
       "connectivity": true,
       "destinations": true

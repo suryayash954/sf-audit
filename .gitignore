@@ -12,6 +12,7 @@ target/
 # Web IDE, App Studio
 .che/
 .gen/
+gen/db
 
 # MTA
 *_mta_build_tmp

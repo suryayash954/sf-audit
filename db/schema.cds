@@ -1,237 +1,277 @@
+// srv/schema.cds
 namespace sap.sf.audit;
 
-using { Currency, Country, Timezone, Language } from '@sap/cds/common';
+using { managed } from '@sap/cds/common';
 
 /**
- * Audit Header - Master record for each audit run
+ * Audit Run - Main container for each audit execution
  */
-entity AuditHeaders {
-    key AuditID         : UUID                  @title: 'Audit ID';
-        Instance        : String(10)            @title: 'Instance' enum { QAS; PROD; };
-        GeneratedOn     : Timestamp             @title: 'Generated On';
-        ExtractionMode  : String(10)            @title: 'Extraction Mode' enum { FULL; SAMPLE; };
-        ReportName      : String(255)           @title: 'Report Name';
-        Status          : String(20)            @title: 'Status' enum { Running; Completed; Failed; } default 'Running';
-        CreatedAt       : Timestamp             @title: 'Created At' @cds.on.insert: $now;
-        CreatedBy       : String(100)           @title: 'Created By' @cds.on.insert: $user;
-        ModifiedAt      : Timestamp             @title: 'Modified At' @cds.on.insert: $now @cds.on.update: $now;
-        ModifiedBy      : String(100)           @title: 'Modified By' @cds.on.insert: $user @cds.on.update: $user;
+entity AuditRuns : managed {
+    key ID      : UUID;
+        name    : String(255);
+        description : String(1000);
+        status  : String(20) default 'CREATED'; // PENDING, RUNNING, COMPLETED, FAILED
+        mode    : String(20); // FULL, SAMPLE
+        sampleGroupSize : Integer default 0;
+        sampleMemberSize : Integer default 0;
+        sampleRoleSize : Integer default 0;
+        extractGroups : Boolean default true;
+        extractRoles : Boolean default true;
+        startTime : Timestamp;
+        endTime : Timestamp;
+        errorMessage : String(2000);
 }
 
 /**
- * Permission Groups (Static and Dynamic combined)
+ * Permission Groups (Static and Dynamic)
  */
-/**
- * Permission Groups (Static and Dynamic combined)
- */
-entity PermissionGroups {
-    key GroupID         : Integer               @title: 'Group ID';
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-
-        GroupName       : String(255)           @title: 'Group Name';
-        GroupType       : String(50)            @title: 'Group Type' enum { permission; ectworkflow; onboarding2; homepage_tile_group; };
-        StaticOrDynamic : String(10)            @title: 'Type' enum { STATIC; DYNAMIC; };
+entity Groups {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        groupID     : String(50);
+        groupName   : String(255);
+        groupType   : String(50); // STATIC, DYNAMIC
+        groupTypeInternal : String(20); // permission, ectworkflow, homepage_tile_group, onboarding2
+        activeMembershipCount : Integer;
+        totalMemberCount : Integer;
+        createdBy   : String(255);
+        lastModifiedDate : Timestamp;
         
-        // Membership counts
-        ActiveMemberCount : Integer             @title: 'Active Members' default 0;
-        TotalMemberCount  : Integer             @title: 'Total Members' default 0;
-        
-        // Metadata from SF
-        CreatedBy_SF    : String(100)           @title: 'Created By (SF)';  // Renamed to avoid conflict
-        LastModifiedDate : Timestamp            @title: 'Last Modified';
-        
-        // Audit trail (CAP managed)
-        createdAt       : Timestamp             @cds.on.insert: $now;
-        createdBy       : String(100)           @cds.on.insert: $user;
-}
-
-
-/**
- * Users - Master user data from SF
- */
-entity Users {
-    key UserID          : String(100)           @title: 'User ID';
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-
-        UserName        : String(255)           @title: 'Username';
-        FirstName       : String(255)           @title: 'First Name';
-        LastName        : String(255)           @title: 'Last Name';
-        Email           : String(255)           @title: 'Email';
-        Status          : String(10)            @title: 'Status' enum { active; inactive; };
-        
-        // Job & Organization
-        JobTitle        : String(255)           @title: 'Job Title';
-        JobCode         : String(50)            @title: 'Job Code';
-        Department      : String(255)           @title: 'Department';
-        Division        : String(255)           @title: 'Division';
-        Location        : String(255)           @title: 'Location';
-        Company         : String(255)           @title: 'Company';
-        BusinessUnit    : String(255)           @title: 'Business Unit';
-        HireDate        : Date                  @title: 'Hire Date';
-        TimeZone        : String(50)            @title: 'Time Zone';
-        
-        // SF metadata
-        LastModifiedDateTime : Timestamp        @title: 'Last Modified in SF';
-        CreatedBy_SF    : String(100)           @title: 'Created By (SF)';  // Add if needed from SF
-        
-        // Audit trail (CAP managed)
-        createdAt       : Timestamp             @cds.on.insert: $now;
-        createdBy       : String(100)           @cds.on.insert: $user;
+        // Navigation
+        members : Association to GroupMembers;
+        groupSizeDistribution : Association to GroupSizeDistribution;
 }
 
 /**
- * Group Memberships - Junction between Users and PermissionGroups
+ * Group Members - Users belonging to groups
  */
-entity GroupMemberships {
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-    key GroupID         : Integer;
-    key UserID          : String(100);
-
-    // Navigation
-    Group : Association to PermissionGroups on Group.parent_AuditID = $self.parent_AuditID and Group.GroupID = $self.GroupID;
-    User  : Association to Users on User.parent_AuditID = $self.parent_AuditID and User.UserID = $self.UserID;
-}
-
-/**
- * RBP Roles
- */
-entity RBPRoles {
-    key RoleID          : String(100)           @title: 'Role ID';
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-
-        RoleName        : String(255)           @title: 'Role Name';
-        RoleDesc        : String(1000)          @title: 'Description';
-        RoleType        : String(50)            @title: 'Role Type';
-        UserType        : String(50)            @title: 'User Type';
-        LastModifiedBy  : String(100)           @title: 'Last Modified By';
-        LastModifiedDate : Timestamp            @title: 'Last Modified';
+entity GroupMembers {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        group       : Association to Groups;
+        user        : Association to Users;
         
-        // Audit trail
-        createdAt       : Timestamp             @cds.on.insert: $now;
-        createdBy       : String(100)           @cds.on.insert: $user;
+        // Denormalized for performance
+        groupID     : String(50);
+        groupName   : String(255);
+        groupType   : String(50);
+        userId      : String(100);
+        userName    : String(255);
 }
 
 /**
- * Role Target Population - Groups assigned to roles
+ * Users - Person data from SF
  */
-entity RoleTargetPopulation {
-    key TargetID       : Integer @cds.autoIncrement @title: 'Target ID';
-    key parent_AuditID : Association to AuditHeaders @title: 'Audit';
-
-    RoleID             : String(100) @title: 'Role ID';
-    RuleID             : String(100) @title: 'Rule ID';
-    Source             : String(50)  @title: 'Source' enum { 
-        targetGroups; 
-        embedded_rules; 
-        api_fetch; 
-    };
-    GroupID            : Integer     @title: 'Group ID';
-    GroupName          : String(255) @title: 'Group Name';
-    RuleMyFilter       : String(500) @title: 'Rule Filter';
-    RuleStatus         : Integer     @title: 'Rule Status';
-    StaticGroup        : Boolean     @title: 'Is Static' default false;
-    UserType           : String(50)  @title: 'User Type';
-
-    // Navigation
-    Role : Association to RBPRoles 
-        on Role.parent_AuditID = $self.parent_AuditID 
-       and Role.RoleID = $self.RoleID;
-}
-
-
-/**
- * User-Role Assignments (Derived from group memberships)
- */
-entity UserRoleAssignments {
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-    key UserID          : String(100);
-    key RoleID          : String(100);
-
-        AssignedViaGroup : String(255)          @title: 'Assigned Via Group';
+entity Users : managed {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        userId      : String(100);
+        userName    : String(255) @title: 'Username';
+        firstName   : String(255);
+        lastName    : String(255);
+        status      : String(20); // active, inactive
+        email       : String(255);
+        hireDate    : Timestamp;
+        lastModifiedDateTime : Timestamp;
+        timeZone    : String(100);
         
-        // Navigations
-        User : Association to Users on User.parent_AuditID = $self.parent_AuditID and User.UserID = $self.UserID;
-        Role : Association to RBPRoles on Role.parent_AuditID = $self.parent_AuditID and Role.RoleID = $self.RoleID;
+        // Job & Organization fields
+        jobTitle    : String(255);
+        jobCode     : String(50);
+        department  : String(255);
+        division    : String(255);
+        location    : String(255);
+        company     : String(255);
+        businessUnit : String(255);
+        
+        // Custom fields
+        custom01    : String(255); // Cost Center
+        custom02    : String(255);
+        custom03    : String(255);
+        
+        // Navigation
+        groups : Association to GroupMembers;
+        userGroupCount : Association to UserGroupCountDistribution;
+        inactiveAccess : Association to InactiveUserAccess;
 }
 
 /**
- * Analytics: Users with multiple groups (pre-computed)
+ * Permission Roles
+ */
+entity Roles : managed {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        roleId      : String(100);
+        roleName    : String(255);
+        roleDesc    : String(1000);
+        roleType    : String(50);
+        userType    : String(50);
+        lastModifiedBy : String(255);
+        lastModifiedDate : Timestamp;
+        
+        // Navigation
+        targetPopulations : Association to RoleTargetPopulations;
+        unusedRoles : Association to UnusedRoles;
+}
+
+/**
+ * Role Target Populations - Groups/Users that receive role assignments
+ */
+entity RoleTargetPopulations {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        role        : Association to Roles;
+        
+        roleId      : String(100);
+        roleName    : String(255);
+        ruleId      : String(50);
+        source      : String(50); // targetGroups, embedded_rules, api_fetch
+        ruleMyFilter : String(50); // SELF, DEPARTMENT, etc.
+        ruleStatus  : Integer;
+        
+        // Target group information
+        groupId     : String(50);
+        groupName   : String(255);
+        groupType   : String(50);
+        activeMembershipCount : Integer;
+        totalMemberCount : Integer;
+        staticGroup : Boolean;
+        userType    : String(50);
+        
+        // Denormalized for quick lookup
+        createdBy   : String(255);
+        lastModifiedDate : Timestamp;
+}
+
+/**
+ * User-Role Mappings - Derived from groups targeting roles
+ */
+entity UserRoleMappings {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        user        : Association to Users;
+        role        : Association to Roles;
+        userId      : String(100);
+        userName    : String(255);
+        roleId      : String(100);
+        roleName    : String(255);
+        assignedViaGroup : String(255);
+        
+}
+
+/**
+ * Users with Multiple Group Access - Risk Analysis
  */
 entity MultiGroupUsers {
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-    key UserID          : String(100);
-
-        GroupCount      : Integer               @title: 'Number of Groups';
-        GroupNames      : String(5000)          @title: 'Group Names';
-        RiskLevel       : String(10)            @title: 'Risk Level' enum { Low; Medium; High; };
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        user        : Association to Users;
         
-        // Navigation
-        User : Association to Users on User.parent_AuditID = $self.parent_AuditID and User.UserID = $self.UserID;
+        userName    : String(255);
+        groupCount  : Integer;
+        groupNames  : String(5000);
+        riskLevel   : String(20); // Low, Medium, High
+        
+        // Risk scoring
+        riskScore   : Integer;
+        riskCategory : String(20);
+        recommendedAction : String(255);
 }
 
 /**
- * Analytics: Group Size Distribution
+ * Inactive Users with Active Access - Risk Report
+ */
+entity InactiveUserAccess {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        user        : Association to Users;
+        
+        userName    : String(255);
+        userId      : String(100);
+        firstName   : String(255);
+        lastName    : String(255);
+        status      : String(20);
+        hireDate    : Timestamp;
+        permissionGroups : String(5000);
+        groupCount  : Integer;
+        
+        // Risk indicators
+        riskScore   : Integer;
+        riskCategory : String(20);
+        recommendedAction : String(255);
+}
+
+/**
+ * Group Size Distribution - Analytics
  */
 entity GroupSizeDistribution {
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-    key Bucket          : String(20)            @title: 'Size Bucket' enum { 
-        SIZE_1_5        @title: '1–5 members';
-        SIZE_6_20       @title: '6–20 members';
-        SIZE_21_50      @title: '21–50 members';
-        SIZE_51_100     @title: '51–100 members';
-        SIZE_100_PLUS   @title: '100+ members';
-    };
-
-        GroupCount      : Integer               @title: 'Number of Groups';
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        bucket      : String(50); // 1–5 members, 6–20 members, etc.
+        groupCount  : Integer;
 }
 
 /**
- * Analytics: Users by Group Count Distribution
+ * Static vs Dynamic Group Comparison - Analytics
+ */
+entity StaticVsDynamicGroups {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        groupType   : String(20); // Static, Dynamic
+        averageGroupSize : Integer;
+        totalGroups : Integer;
+        totalMembers : Integer;
+}
+
+/**
+ * Users by Group Count Distribution - Analytics
  */
 entity UserGroupCountDistribution {
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-    key Bucket          : String(20)            @title: 'Group Count Bucket' enum { 
-        ONE_GROUP       @title: '1 group';
-        TWO_GROUPS      @title: '2 groups';
-        THREE_TO_FOUR   @title: '3–4 groups';
-        FIVE_TO_SEVEN   @title: '5–7 groups';
-        EIGHT_PLUS      @title: '8+ groups';
-    };
-
-        UserCount       : Integer               @title: 'Number of Users';
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        bucket      : String(50); // 1 group, 2 groups, 3–4 groups, 5–7 groups, 8+ groups
+        userCount   : Integer;
+        
+        // For highest bucket tracking
+        isHighestBucket : Boolean default false;
 }
 
 /**
- * Unused Roles (for cleanup recommendations)
+ * Unused Roles - Roles with no target population
  */
 entity UnusedRoles {
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-    key RoleID          : String(100);
-
-        Recommendation  : String(255)           @title: 'Recommendation' default 'Review / Decommission';
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
+        role        : Association to Roles;
         
-        // Navigation
-        Role : Association to RBPRoles on Role.parent_AuditID = $self.parent_AuditID and Role.RoleID = $self.RoleID;
+        roleId      : String(100);
+        roleName    : String(255);
+        roleType    : String(50);
+        lastModifiedDate : Timestamp;
+        recommendation : String(255) default 'Review / Decommission';
 }
 
 /**
- * Audit Sign-Off (for compliance tracking)
+ * Executive Summary Metrics - Aggregated KPIs
  */
-entity AuditSignOff {
-    key parent_AuditID  : Association to AuditHeaders @title: 'Audit';
-
-        ReviewedBy      : String(100)           @title: 'Reviewed By';
-        ReviewDate      : Date                  @title: 'Review Date';
-        ReviewStatus    : String(20)            @title: 'Status' enum { Draft; Reviewed; Approved; };
-        ReviewerComments : String(1000)         @title: 'Comments';
+entity ExecutiveSummary {
+    key ID          : UUID;
+        auditRunID  : Association to AuditRuns;
         
-        ApprovedBy      : String(100)           @title: 'Approved By';
-        ApprovalDate    : Date                  @title: 'Approval Date';
-        FinalNotes      : String(1000)          @title: 'Final Notes';
+        totalStaticGroups : Integer;
+        totalDynamicGroups : Integer;
+        totalGroups : Integer;
+        totalUniqueUsers : Integer;
+        usersHighAccess : Integer; // 5+ groups
+        groupsLargeMembership : Integer; // 51+ members
         
-        // Audit trail
-        createdAt       : Timestamp             @cds.on.insert: $now;
-        createdBy       : String(100)           @cds.on.insert: $user;
-        modifiedAt      : Timestamp             @cds.on.insert: $now @cds.on.update: $now;
-        modifiedBy      : String(100)           @cds.on.insert: $user @cds.on.update: $user;
+        // Risk indicators
+        highAccessUsersCount : Integer;
+        largeGroupsCount : Integer;
+        
+        // Instance metadata
+        instanceLabel : String(20);
+        generationTimestamp : Timestamp;
+        extractionMode : String(20);
 }
+

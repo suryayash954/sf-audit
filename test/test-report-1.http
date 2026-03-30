@@ -1,0 +1,185 @@
+@baseUrl = http://localhost:4005/SuccessFactorRBPReport
+@contentType = application/json
+
+# Replace with actual AuditRun ID
+@auditId = 8e4634e4-300f-403c-8bb7-369dc801354c
+
+############################################################
+### 1. RISK DASHBOARD
+############################################################
+GET {{baseUrl}}/getRiskDashboard(auditRunID="{{auditId}}")
+Content-Type: {{contentType}}
+
+
+############################################################
+### 2. EXECUTIVE SUMMARY
+############################################################
+GET {{baseUrl}}/getExecutiveSummary(auditRunID="{{auditId}}")
+Content-Type: {{contentType}}
+
+
+############################################################
+### 3. GROUP DETAILS
+############################################################
+GET {{baseUrl}}/getGroupDetails(auditRunID="{{auditId}}",groupType=null,minMembers= 0,top=50,skip=0)
+Content-Type: {{contentType}}
+
+############################################################
+### 4. GROUP SIZE ANALYSIS
+############################################################
+POST {{baseUrl}}/getGroupSizeAnalysis
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}"
+}
+
+############################################################
+### 5. USER DETAILS
+############################################################
+POST {{baseUrl}}/getUserDetails
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "status": null,
+  "minGroupCount": 0,
+  "department": null,
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 6. USER ACCESS ANALYSIS
+############################################################
+POST {{baseUrl}}/getUserAccessAnalysis
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "top": 20
+}
+
+############################################################
+### 7. HIGH RISK USERS
+############################################################
+POST {{baseUrl}}/getHighRiskUsers
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "minRiskScore": 5,
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 8. INACTIVE USERS WITH ACCESS
+############################################################
+POST {{baseUrl}}/getInactiveUsersWithAccess
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "riskCategory": null,
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 9. ROLE DETAILS
+############################################################
+POST {{baseUrl}}/getRoleDetails
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "usageStatus": null,
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 10. ROLE COVERAGE ANALYSIS
+############################################################
+POST {{baseUrl}}/getRoleCoverageAnalysis
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}"
+}
+
+############################################################
+### 11. GROUP ROLE MATRIX
+############################################################
+POST {{baseUrl}}/getGroupRoleMatrix
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 12. USER ROLE MATRIX
+############################################################
+POST {{baseUrl}}/getUserRoleMatrix
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "userName": null,
+  "roleName": null,
+  "department": null,
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 13. USERS BY ROLE
+############################################################
+POST {{baseUrl}}/getUsersByRole
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "roleId": "REPLACE_ROLE_ID",
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 14. ROLES BY USER
+############################################################
+POST {{baseUrl}}/getRolesByUser
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "userName": "REPLACE_USERNAME",
+  "top": 50,
+  "skip": 0
+}
+
+############################################################
+### 15. EXPORT FULL AUDIT DATA (JSON BINARY)
+############################################################
+POST {{baseUrl}}/exportAuditData
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "format": "JSON"
+}
+
+############################################################
+### 16. EXPORT REPORT (CSV)
+############################################################
+POST {{baseUrl}}/exportReport
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}",
+  "reportType": "groups"
+}

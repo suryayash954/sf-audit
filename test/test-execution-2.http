@@ -1,0 +1,60 @@
+@baseUrl = http://localhost:4004/SuccessFactorRBPAudit
+@contentType = application/json
+
+###############################################
+### 1. CREATE AUDIT (Triggers Background Job)
+###############################################
+
+POST {{baseUrl}}/AuditRuns
+Content-Type: {{contentType}}
+
+{
+  "name": "Demo Audit Run",
+  "description": "Test audit execution",
+  "mode": "FULL",
+  "extractGroups": true,
+  "extractRoles": true,
+  "sampleGroupSize": 0,
+  "sampleMemberSize": 0,
+  "sampleRoleSize": 0
+}
+
+###
+# Copy the ID from response and paste below
+
+@auditId = REPLACE_WITH_ID
+
+###############################################
+### 2. GET AUDIT STATUS
+###############################################
+
+POST {{baseUrl}}/getAuditStatus
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}"
+}
+
+###############################################
+### 3. LIST ALL AUDITS
+###############################################
+
+POST {{baseUrl}}/listAuditRuns
+Content-Type: {{contentType}}
+
+{
+  "status": null,
+  "top": 50,
+  "skip": 0
+}
+
+###############################################
+### 5. DELETE AUDIT
+###############################################
+
+POST {{baseUrl}}/deleteAuditRun
+Content-Type: {{contentType}}
+
+{
+  "auditRunID": "{{auditId}}"
+}

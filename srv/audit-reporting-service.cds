@@ -1,0 +1,449 @@
+// srv/audit-reporting-service.cds
+
+using { sap.sf.audit as db } from '../db/schema';
+
+/**
+ * Audit Reporting Service
+ * Provides comprehensive reporting and analytics on audit data
+ */
+service AuditReportingService @(path: '/SuccessFactorRBPReport') {
+    
+    // ============================================
+    // Core Entities - Read-only for reporting
+    // ============================================
+    
+    /**
+     * Groups with member counts
+     */
+    entity Groups as projection on db.Groups;
+    
+    /**
+     * Users with job and org data
+     */
+    entity Users as projection on db.Users;
+    
+    /**
+     * Roles with target populations
+     */
+    entity Roles as projection on db.Roles;
+    
+    /**
+     * Group memberships
+     */
+    entity GroupMembers as projection on db.GroupMembers;
+    
+    /**
+     * User-role assignments
+     */
+    entity UserRoleMappings as projection on db.UserRoleMappings;
+    
+    /**
+     * Multi-group users risk analysis
+     */
+    entity MultiGroupUsers as projection on db.MultiGroupUsers;
+    
+    /**
+     * Inactive users with access
+     */
+    entity InactiveUserAccess as projection on db.InactiveUserAccess;
+    
+    /**
+     * Unused roles
+     */
+    entity UnusedRoles as projection on db.UnusedRoles;
+    
+    /**
+     * Executive summary metrics
+     */
+    entity ExecutiveSummary as projection on db.ExecutiveSummary;
+    
+    // ============================================
+    // Dashboard & Summary Functions
+    // ============================================
+    
+    /**
+     * Get comprehensive risk dashboard for an audit run - Working
+     */
+    function getRiskDashboard(
+        auditRunID: UUID
+    ) returns {
+        auditInfo: {
+            name: String(255);
+            instance: String(20);
+            generatedAt: Timestamp;
+            status: String(20);
+            mode: String(20);
+        };
+        riskMetrics: {
+            highRiskUsers: Integer;
+            mediumRiskUsers: Integer;
+            lowRiskUsers: Integer;
+            inactiveUsersWithAccess: Integer;
+            unusedRolesCount: Integer;
+            largeGroupsCount: Integer;
+        };
+        totals: {
+            totalGroups: Integer;
+            totalUsers: Integer;
+            totalRoles: Integer;
+            totalGroupMembers: Integer;
+            totalRoleAssignments: Integer;
+        };
+    };
+    
+    /**
+     * Get executive summary for audit run - Not Implemented
+     */
+    function getExecutiveSummary(
+        auditRunID: UUID
+    ) returns {
+        auditInfo: {
+            name: String(255);
+            instance: String(20);
+            generatedAt: Timestamp;
+            mode: String(20);
+            status: String(20);
+        };
+        metrics: {
+            totalGroups: Integer;
+            staticGroups: Integer;
+            dynamicGroups: Integer;
+            totalUsers: Integer;
+            highAccessUsers: Integer;
+            largeGroups: Integer;
+            totalRoles: Integer;
+            unusedRoles: Integer;
+        };
+        riskIndicators: {
+            highAccessUsersCount: Integer;
+            largeGroupsCount: Integer;
+            inactiveUsersWithAccess: Integer;
+            unusedRolesCount: Integer;
+        };
+        recommendations: array of {
+            category: String(50);
+            priority: String(20);
+            description: String(500);
+            affectedCount: Integer;
+        };
+    };
+    
+    // ============================================
+    // Group Analysis Functions
+    // ============================================
+    
+    /**
+     * Get detailed group information with metrics - Working
+     */
+    function getGroupDetails(
+        auditRunID: UUID,
+        groupType: String(20) default null,
+        minMembers: Integer default 0,
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        groupID: String(50);
+        groupName: String(255);
+        groupType: String(50);
+        groupTypeInternal: String(50);
+        totalMemberCount: Integer;
+        activeMemberCount: Integer;
+        actualMemberCount: Integer;
+        roleTargetCount: Integer;
+        createdBy: String(255);
+        lastModifiedDate: Timestamp;
+    };
+    
+    /**
+     * Get group size distribution analysis - not Implemented
+     */
+    function getGroupSizeAnalysis(
+        auditRunID: UUID
+    ) returns {
+        distribution: array of {
+            sizeRange: String(50);
+            groupCount: Integer;
+            percentage: Decimal;
+        };
+        summary: {
+            totalGroups: Integer;
+            averageGroupSize: Decimal;
+            medianGroupSize: Decimal;
+            maxGroupSize: Integer;
+            minGroupSize: Integer;
+        };
+        oversizedGroups: array of {
+            groupName: String(255);
+            totalMembers: Integer;
+            activeMembers: Integer;
+        };
+        staticVsDynamic: array of {
+            groupType: String(20);
+            count: Integer;
+            averageSize: Decimal;
+            totalMembers: Integer;
+        };
+    };
+    
+    // ============================================
+    // User Analysis Functions
+    // ============================================
+    
+    /**
+     * Get detailed user information with access metrics - not implemented
+     */
+    function getUserDetails(
+        auditRunID: UUID,
+        status: String(20) default null,
+        minGroupCount: Integer default 0,
+        department: String(255) default null,
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        userId: String(100);
+        userName: String(255);
+        firstName: String(255);
+        lastName: String(255);
+        status: String(20);
+        email: String(255);
+        department: String(255);
+        division: String(255);
+        location: String(255);
+        jobTitle: String(255);
+        groupCount: Integer;
+        roleCount: Integer;
+        groupNames: String(5000);
+        riskLevel: String(20);
+    };
+    
+    /**
+     * Get user access analysis - users with most permissions
+     */
+    function getUserAccessAnalysis(
+        auditRunID: UUID,
+        top: Integer default 20
+    ) returns {
+        topUsersByGroupCount: array of {
+            userName: String(255);
+            firstName: String(255);
+            lastName: String(255);
+            department: String(255);
+            jobTitle: String(255);
+            groupCount: Integer;
+            roleCount: Integer;
+            riskLevel: String(20);
+        };
+        accessDistribution: array of {
+            groupCountRange: String(50);
+            userCount: Integer;
+            percentage: Decimal;
+        };
+        usersWithExcessiveAccess: array of {
+            userName: String(255);
+            groupCount: Integer;
+            roleCount: Integer;
+            groups: String(5000);
+        };
+    };
+    
+    /**
+     * Get high-risk users report - Not Implemented
+     */
+    function getHighRiskUsers(
+        auditRunID: UUID,
+        minRiskScore: Integer default 5,
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        userName: String(255);
+        firstName: String(255);
+        lastName: String(255);
+        department: String(255);
+        jobTitle: String(255);
+        userStatus: String(20);
+        groupCount: Integer;
+        groupNames: String(5000);
+        riskLevel: String(20);
+        riskScore: Integer;
+        riskCategory: String(20);
+        recommendedAction: String(255);
+        isInactive: Boolean;
+    };
+    
+    /**
+     * Get inactive users with access report - Not Implemented
+     */
+    function getInactiveUsersWithAccess(
+        auditRunID: UUID,
+        riskCategory: String(20) default null,
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        userName: String(255);
+        firstName: String(255);
+        lastName: String(255);
+        department: String(255);
+        status: String(20);
+        hireDate: Timestamp;
+        permissionGroups: String(5000);
+        groupCount: Integer;
+        riskScore: Integer;
+        riskCategory: String(20);
+        recommendedAction: String(255);
+    };
+    
+    // ============================================
+    // Role Analysis Functions
+    // ============================================
+    
+    /**
+     * Get detailed role information with assignment metrics - Not Implemented
+     */
+    function getRoleDetails(
+        auditRunID: UUID,
+        usageStatus: String(20) default null,
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        roleId: String(100);
+        roleName: String(255);
+        roleDesc: String(1000);
+        roleType: String(50);
+        userType: String(50);
+        lastModifiedBy: String(255);
+        lastModifiedDate: Timestamp;
+        targetPopulationCount: Integer;
+        assignedUserCount: Integer;
+        usageStatus: String(20);
+    };
+    
+    /**
+     * Get role coverage analysis
+     */
+    function getRoleCoverageAnalysis(
+        auditRunID: UUID
+    ) returns {
+        summary: {
+            totalRoles: Integer;
+            rolesWithTargets: Integer;
+            unusedRoles: Integer;
+            rolesWithMultipleTargets: Integer;
+            averageTargetsPerRole: Decimal;
+            averageAssignmentsPerRole: Decimal;
+        };
+        rolesByType: array of {
+            roleType: String(50);
+            count: Integer;
+            usedCount: Integer;
+            unusedCount: Integer;
+            totalAssignments: Integer;
+        };
+        topRolesByAssignments: array of {
+            roleName: String(255);
+            assignedUserCount: Integer;
+            targetGroupCount: Integer;
+        };
+        unusedRolesList: array of {
+            roleId: String(100);
+            roleName: String(255);
+            lastModifiedDate: Timestamp;
+        };
+    };
+    
+    /**
+     * Get group-role matrix - Not Implemented
+     */
+    function getGroupRoleMatrix(
+        auditRunID: UUID,
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        groupId: String(50);
+        groupName: String(255);
+        roleId: String(100);
+        roleName: String(255);
+        ruleId: String(50);
+        ruleMyFilter: String(50);
+        source: String(50);
+    };
+    
+    // ============================================
+    // User-Role Mapping Functions
+    // ============================================
+    
+    /**
+     * Get user-role matrix for access review - Not Implemented
+     */
+    function getUserRoleMatrix(
+        auditRunID: UUID,
+        userName: String(255) default null,
+        roleName: String(255) default null,
+        department: String(255) default null,
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        userName: String(255);
+        firstName: String(255);
+        lastName: String(255);
+        userStatus: String(20);
+        department: String(255);
+        jobTitle: String(255);
+        roleName: String(255);
+        roleType: String(50);
+        assignedViaGroup: String(255);
+    };
+    
+    /**
+     * Get users by role for access review - Not Implemented
+     */
+    function getUsersByRole(
+        auditRunID: UUID,
+        roleId: String(100),
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        userName: String(255);
+        firstName: String(255);
+        lastName: String(255);
+        department: String(255);
+        jobTitle: String(255);
+        userStatus: String(20);
+        assignedViaGroup: String(255);
+    };
+    
+    /**
+     * Get roles by user for access review - Not Implemented
+     */
+    function getRolesByUser(
+        auditRunID: UUID,
+        userName: String(255),
+        top: Integer default 100,
+        skip: Integer default 0
+    ) returns array of {
+        roleId: String(100);
+        roleName: String(255);
+        roleType: String(50);
+        assignedViaGroup: String(255);
+    };
+    
+    // ============================================
+    // Export Functions 
+    // ============================================
+    
+    /**
+     * Export complete audit data as JSON - Not Implemented
+     */
+    function exportAuditData(
+        auditRunID: UUID,
+        format: String(20) default 'JSON'
+    ) returns LargeBinary;
+    
+    /**
+     * Export specific report as CSV - Not Implemented
+     */
+    function exportReport(
+        auditRunID: UUID,
+        reportType: String(50), // groups, users, roles, risk, matrix
+        format: String(20) default 'CSV'
+    ) returns LargeBinary;
+}

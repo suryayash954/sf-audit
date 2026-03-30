@@ -1,0 +1,45 @@
+
+
+
+ 
+### Create a new AuditRun (POST)
+POST http://localhost:4004/SuccessFactorRBPAudit/AuditRuns
+Content-Type: application/json
+
+{
+  "name": "Quarterly Access Audit Working",
+  "description": "Audit of SuccessFactors roles and groups for Q1",
+  "mode": "FULL",
+  "status": "CREATED",
+  "extractGroups": true,
+  "extractRoles": true,
+  "sampleGroupSize": 5,
+  "sampleMemberSize": 10,
+  "sampleRoleSize": 3
+}
+
+### Get status of an audit run (replace with actual ID returned above)
+POST http://localhost:4004/SuccessFactorRBPAudit/getAuditStatus
+Content-Type: application/json
+
+{
+  "auditRunID": "REPLACE_WITH_RETURNED_UUID"
+}
+
+### Delete an audit run
+POST http://localhost:4004/SuccessFactorRBPAudit/deleteAuditRun
+Content-Type: application/json
+
+{
+  "auditRunID": "REPLACE_WITH_RETURNED_UUID"
+}
+
+### List all audit runs
+POST http://localhost:4004/SuccessFactorRBPAudit/listAuditRuns
+Content-Type: application/json
+
+{
+  "status": null,
+  "top": 10,
+  "skip": 0
+}
