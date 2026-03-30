@@ -1,5 +1,7 @@
+### Sync Users in DB
 
-
+POST http://localhost:4004/SuccessFactorRBPAudit/syncUsers
+Content-Type: application/json
 
  
 ### Create a new AuditRun (POST)
@@ -7,7 +9,7 @@ POST http://localhost:4004/SuccessFactorRBPAudit/AuditRuns
 Content-Type: application/json
 
 {
-  "name": "Quarterly Access Audit Working",
+  "name": "Quarterly Access Audit",
   "description": "Audit of SuccessFactors roles and groups for Q1",
   "mode": "FULL",
   "status": "CREATED",

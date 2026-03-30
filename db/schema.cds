@@ -10,7 +10,7 @@ entity AuditRuns : managed {
     key ID      : UUID;
         name    : String(255);
         description : String(1000);
-        status  : String(20) default 'CREATED'; // PENDING, RUNNING, COMPLETED, FAILED
+        status  : String(20) default 'CREATED';
         mode    : String(20); // FULL, SAMPLE
         sampleGroupSize : Integer default 0;
         sampleMemberSize : Integer default 0;
@@ -20,6 +20,16 @@ entity AuditRuns : managed {
         startTime : Timestamp;
         endTime : Timestamp;
         errorMessage : String(2000);
+        
+        // Performance tracking
+        groupsProcessed : Integer default 0;
+        membershipsProcessed : Integer default 0;
+        rolesProcessed : Integer default 0;
+        
+        // Sync metadata
+        userSyncRequired : Boolean default false;
+        userSyncCompleted : Boolean default false;
+        userSyncAt : Timestamp;
 }
 
 /**
@@ -31,7 +41,7 @@ entity Groups {
         groupID     : String(50);
         groupName   : String(255);
         groupType   : String(50); // STATIC, DYNAMIC
-        groupTypeInternal : String(20); // permission, ectworkflow, homepage_tile_group, onboarding2
+        groupTypeInternal : String(20);
         activeMembershipCount : Integer;
         totalMemberCount : Integer;
         createdBy   : String(255);
@@ -39,9 +49,7 @@ entity Groups {
         
         // Navigation
         members : Association to GroupMembers;
-        groupSizeDistribution : Association to GroupSizeDistribution;
 }
-
 /**
  * Group Members - Users belonging to groups
  */
@@ -49,50 +57,52 @@ entity GroupMembers {
     key ID          : UUID;
         auditRunID  : Association to AuditRuns;
         group       : Association to Groups;
-        user        : Association to Users;
+        user        : Association to Users;  // Links to central Users table
         
         // Denormalized for performance
         groupID     : String(50);
         groupName   : String(255);
         groupType   : String(50);
-        userId      : String(100);
+        userId      : String(100);  // References Users.userId
         userName    : String(255);
 }
+
 
 /**
  * Users - Person data from SF
  */
 entity Users : managed {
-    key ID          : UUID;
-        auditRunID  : Association to AuditRuns;
-        userId      : String(100);
-        userName    : String(255) @title: 'Username';
-        firstName   : String(255);
-        lastName    : String(255);
-        status      : String(20); // active, inactive
-        email       : String(255);
-        hireDate    : Timestamp;
+    key userId     : String(100);  // Natural key from SuccessFactors
+        userName   : String(255) @title: 'Username';
+        firstName  : String(255);
+        lastName   : String(255);
+        status     : String(20);   // active, inactive
+        email      : String(255);
+        hireDate   : Timestamp;
+        terminationDate : Timestamp;
         lastModifiedDateTime : Timestamp;
-        timeZone    : String(100);
+        timeZone   : String(100);
         
         // Job & Organization fields
-        jobTitle    : String(255);
-        jobCode     : String(50);
-        department  : String(255);
-        division    : String(255);
-        location    : String(255);
-        company     : String(255);
+        jobTitle   : String(255);
+        jobCode    : String(50);
+        department : String(255);
+        division   : String(255);
+        location   : String(255);
+        company    : String(255);
         businessUnit : String(255);
         
         // Custom fields
-        custom01    : String(255); // Cost Center
-        custom02    : String(255);
-        custom03    : String(255);
+        custom01   : String(255); // Cost Center
+        custom02   : String(255);
+        custom03   : String(255);
+        
+        // Sync metadata
+        lastSyncAt : Timestamp;
+        isActive   : Boolean default true;
         
         // Navigation
-        groups : Association to GroupMembers;
-        userGroupCount : Association to UserGroupCountDistribution;
-        inactiveAccess : Association to InactiveUserAccess;
+        groupMemberships : Association to GroupMembers;
 }
 
 /**
@@ -110,8 +120,7 @@ entity Roles : managed {
         lastModifiedDate : Timestamp;
         
         // Navigation
-        targetPopulations : Association to RoleTargetPopulations;
-        unusedRoles : Association to UnusedRoles;
+        userMappings : Association to UserRoleMappings;
 }
 
 /**
@@ -149,14 +158,13 @@ entity RoleTargetPopulations {
 entity UserRoleMappings {
     key ID          : UUID;
         auditRunID  : Association to AuditRuns;
-        user        : Association to Users;
+        user        : Association to Users;  // Links to central Users table
         role        : Association to Roles;
         userId      : String(100);
         userName    : String(255);
         roleId      : String(100);
         roleName    : String(255);
         assignedViaGroup : String(255);
-        
 }
 
 /**
@@ -165,14 +173,12 @@ entity UserRoleMappings {
 entity MultiGroupUsers {
     key ID          : UUID;
         auditRunID  : Association to AuditRuns;
-        user        : Association to Users;
+        userId      : String(100);  // Reference to central Users.userId
         
         userName    : String(255);
         groupCount  : Integer;
         groupNames  : String(5000);
-        riskLevel   : String(20); // Low, Medium, High
-        
-        // Risk scoring
+        riskLevel   : String(20);
         riskScore   : Integer;
         riskCategory : String(20);
         recommendedAction : String(255);
@@ -184,18 +190,15 @@ entity MultiGroupUsers {
 entity InactiveUserAccess {
     key ID          : UUID;
         auditRunID  : Association to AuditRuns;
-        user        : Association to Users;
+        userId      : String(100);  // Reference to central Users.userId
         
         userName    : String(255);
-        userId      : String(100);
         firstName   : String(255);
         lastName    : String(255);
         status      : String(20);
         hireDate    : Timestamp;
         permissionGroups : String(5000);
         groupCount  : Integer;
-        
-        // Risk indicators
         riskScore   : Integer;
         riskCategory : String(20);
         recommendedAction : String(255);
