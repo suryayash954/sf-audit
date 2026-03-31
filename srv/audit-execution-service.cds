@@ -95,6 +95,18 @@ service AuditExecutionService @(path: '/SuccessFactorRBPAudit') {
     userCount: Integer;
     roleCount: Integer;
   };
+   action runAudit(
+    auditRunID: UUID
+  ) returns {
+    success: Boolean;
+    message: String(255);
+    auditRunID: UUID;
+  };
+
+  
+ 
+  
+
   
   type AuditRequest: {
     name: String(255);

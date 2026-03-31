@@ -20,7 +20,8 @@ const BATCH_CONFIG = {
     MEMBER_BATCH_SIZE: 500,
     API_PARALLEL_LIMIT: 5,
     RETRY_ATTEMPTS: 3,
-    RETRY_DELAY: 1000
+    RETRY_DELAY: 1000,
+    STATUS_UPDATE_INTERVAL: 2000 // Update status every 2 seconds
 };
 
 // Check if running locally
@@ -98,180 +99,230 @@ module.exports = cds.service.impl(async function () {
         }
     });
 
-  function formatUsers(rawUsers) {
-    const formatted = rawUsers.map(user => {
-        // Helper function to safely parse date
-        const parseDate = (dateValue) => {
-            if (!dateValue) return null;
-            
-            // Handle SAP /Date(timestamp)/ format
-            if (typeof dateValue === 'string') {
-                const match = dateValue.match(/\/Date\((\d+)\)\//);
-                if (match) {
-                    return new Date(parseInt(match[1]));
+    function formatUsers(rawUsers) {
+        const formatted = rawUsers.map(user => {
+            const parseDate = (dateValue) => {
+                if (!dateValue) return null;
+                if (typeof dateValue === 'string') {
+                    const match = dateValue.match(/\/Date\((\d+)\)\//);
+                    if (match) return new Date(parseInt(match[1]));
+                    const parsed = new Date(dateValue);
+                    if (!isNaN(parsed.getTime())) return parsed;
                 }
-                
-                // Try parsing as ISO date
-                const parsed = new Date(dateValue);
-                if (!isNaN(parsed.getTime())) {
-                    return parsed;
-                }
-            }
+                if (dateValue instanceof Date && !isNaN(dateValue.getTime())) return dateValue;
+                return null;
+            };
             
-            // If it's already a Date object
-            if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
-                return dateValue;
-            }
+            let hireDate = user.hireDate ? parseDate(user.hireDate) : null;
+            let terminationDate = user.companyExitDate ? parseDate(user.companyExitDate) : null;
+            let lastModifiedDateTime = user.lastModifiedDateTime ? parseDate(user.lastModifiedDateTime) : new Date();
             
-            return null;
-        };
-        
-        // Parse dates safely
-        let hireDate = null;
-        if (user.hireDate) {
-            hireDate = parseDate(user.hireDate);
-        }
-        
-        let terminationDate = null;
-        if (user.companyExitDate) {
-            terminationDate = parseDate(user.companyExitDate);
-        }
-        
-        let lastModifiedDateTime = null;
-        if (user.lastModifiedDateTime) {
-            lastModifiedDateTime = parseDate(user.lastModifiedDateTime);
-        }
-        
-        // If no lastModifiedDateTime, use current date
-        if (!lastModifiedDateTime) {
-            lastModifiedDateTime = new Date();
-        }
-        
-        return {
-            userId: user.userId,
-            userName: user.userName || user.username || '',
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            status: user.status === 'T' ? 'inactive' : 'active',
-            email: user.email || '',
-            hireDate: hireDate,
-            terminationDate: terminationDate,
-            lastModifiedDateTime: lastModifiedDateTime,
-            timeZone: user.timeZone || '',
-            jobTitle: user.jobTitle || user.title || '',
-            jobCode: user.jobCode || '',
-            department: user.department || '',
-            division: user.division || '',
-            location: user.location || '',
-            company: user.company || '',
-            businessUnit: user.businessSegment || '',
-            custom01: user.custom01 || '',
-            custom02: user.custom02 || '',
-            custom03: user.custom03 || '',
-            lastSyncAt: new Date(),
-            isActive: user.status !== 'T'
-        };
-    });
-    
-    return formatted;
-}
-// ============================
-// GET USERS ACTION (Fixed CAP Syntax)
-// ============================
-this.on('getUsers', async (req) => {
-    const { top = 100, skip = 0, status = null, search = null } = req.data;
-
-    try {
-        const db = await cds.connect.to('db');
-
-        // Build the base SELECT
-        let query = SELECT.from('Users');
-        
-        // Build where conditions
-        let conditions = [];
-        
-        if (status) {
-            conditions.push({ status: status });
-        }
-        
-        if (search && search.trim()) {
-            const searchTerm = `%${search.trim()}%`;
-            conditions.push({
-                or: [
-                    { userName: { like: searchTerm } },
-                    { firstName: { like: searchTerm } },
-                    { lastName: { like: searchTerm } },
-                    { email: { like: searchTerm } },
-                    { userId: { like: searchTerm } }
-                ]
-            });
-        }
-        
-        // Apply conditions
-        if (conditions.length > 0) {
-            if (conditions.length === 1) {
-                query = query.where(conditions[0]);
-            } else {
-                query = query.where(conditions);
-            }
-        }
-        
-        // Get total count
-        let countQuery = SELECT.from('Users').columns('count(*) as total');
-        if (conditions.length > 0) {
-            if (conditions.length === 1) {
-                countQuery = countQuery.where(conditions[0]);
-            } else {
-                countQuery = countQuery.where(conditions);
-            }
-        }
-        
-        const countResult = await db.run(countQuery);
-        const total = countResult[0]?.total || 0;
-        
-        // Get paginated results
-        const users = await db.run(
-            query
-                .orderBy('userName')
-                .limit(top, skip)
-                .columns([
-                    'userId',
-                    'userName',
-                    'firstName',
-                    'lastName',
-                    'status',
-                    'email',
-                    'hireDate',
-                    'jobTitle',
-                    'department',
-                    'lastModifiedDateTime'
-                ])
-        );
-
-        return {
-            success: true,
-            data: users,
-            pagination: {
-                total: total,
-                top: top,
-                skip: skip
-            }
-        };
-
-    } catch (error) {
-        logger.error({ error: error.message, stack: error.stack }, 'Failed to get users');
-        req.error(500, `Failed to get users: ${error.message}`);
-        return {
-            success: false,
-            data: [],
-            pagination: {
-                total: 0,
-                top: top,
-                skip: skip
-            }
-        };
+            return {
+                userId: user.userId,
+                userName: user.userName || user.username || '',
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                status: user.status === 'T' ? 'inactive' : 'active',
+                email: user.email || '',
+                hireDate: hireDate,
+                terminationDate: terminationDate,
+                lastModifiedDateTime: lastModifiedDateTime,
+                timeZone: user.timeZone || '',
+                jobTitle: user.jobTitle || user.title || '',
+                jobCode: user.jobCode || '',
+                department: user.department || '',
+                division: user.division || '',
+                location: user.location || '',
+                company: user.company || '',
+                businessUnit: user.businessSegment || '',
+                custom01: user.custom01 || '',
+                custom02: user.custom02 || '',
+                custom03: user.custom03 || '',
+                lastSyncAt: new Date(),
+                isActive: user.status !== 'T'
+            };
+        });
+        return formatted;
     }
-});
+
+    // ============================
+    // GET USERS ACTION
+    // ============================
+    this.on('getUsers', async (req) => {
+        const { top = 100, skip = 0, status = null, search = null } = req.data;
+
+        try {
+            const db = await cds.connect.to('db');
+            let query = SELECT.from('Users');
+            let conditions = [];
+            
+            if (status) conditions.push({ status: status });
+            if (search && search.trim()) {
+                const searchTerm = `%${search.trim()}%`;
+                conditions.push({
+                    or: [
+                        { userName: { like: searchTerm } },
+                        { firstName: { like: searchTerm } },
+                        { lastName: { like: searchTerm } },
+                        { email: { like: searchTerm } },
+                        { userId: { like: searchTerm } }
+                    ]
+                });
+            }
+            
+            if (conditions.length > 0) {
+                query = query.where(conditions.length === 1 ? conditions[0] : conditions);
+            }
+            
+            let countQuery = SELECT.from('Users').columns('count(*) as total');
+            if (conditions.length > 0) {
+                countQuery = countQuery.where(conditions.length === 1 ? conditions[0] : conditions);
+            }
+            
+            const countResult = await db.run(countQuery);
+            const total = countResult[0]?.total || 0;
+            
+            const users = await db.run(
+                query.orderBy('userName').limit(top, skip).columns([
+                    'userId', 'userName', 'firstName', 'lastName', 'status', 'email',
+                    'hireDate', 'jobTitle', 'department', 'lastModifiedDateTime'
+                ])
+            );
+
+            return {
+                success: true,
+                data: users,
+                pagination: { total, top, skip }
+            };
+
+        } catch (error) {
+            logger.error({ error: error.message }, 'Failed to get users');
+            req.error(500, `Failed to get users: ${error.message}`);
+            return { success: false, data: [], pagination: { total: 0, top, skip } };
+        }
+    });
+
+    // ============================
+    // RUN AUDIT ACTION (Manual trigger)
+    // ============================
+    this.on('runAudit', async (req) => {
+        const { auditRunID } = req.data;
+        
+        if (!auditRunID) {
+            req.error(400, 'auditRunID is required');
+            return;
+        }
+        
+        const tx = cds.transaction(req);
+        
+        try {
+            const auditRun = await tx.run(
+                SELECT.one.from('AuditRuns').where({ ID: auditRunID })
+            );
+            
+            if (!auditRun) {
+                req.error(404, `Audit run ${auditRunID} not found`);
+                return;
+            }
+            
+            if (auditRun.status === 'RUNNING') {
+                req.error(409, `Audit run ${auditRunID} is already running`);
+                return;
+            }
+            
+            if (auditRun.status === 'COMPLETED') {
+                req.error(409, `Audit run ${auditRunID} is already completed`);
+                return;
+            }
+            
+            // Start audit asynchronously
+            setImmediate(() => {
+                _runAuditAsync.call(this, auditRunID, {
+                    mode: auditRun.mode,
+                    extractGroups: auditRun.extractGroups,
+                    extractRoles: auditRun.extractRoles,
+                    sampleGroupSize: auditRun.sampleGroupSize,
+                    sampleMemberSize: auditRun.sampleMemberSize,
+                    sampleRoleSize: auditRun.sampleRoleSize
+                }).catch(err => {
+                    logger.error({ auditRunID, error: err.message }, 'Background audit failed');
+                });
+            });
+            
+            return {
+                success: true,
+                message: `Audit run ${auditRunID} started successfully`,
+                auditRunID: auditRunID
+            };
+            
+        } catch (error) {
+            logger.error({ error: error.message }, 'Failed to start audit');
+            req.error(500, `Failed to start audit: ${error.message}`);
+        }
+    });
+
+    // ============================
+    // GET AUDIT STATUS (with real-time updates)
+    // ============================
+    this.on('getAuditStatus', async (req) => {
+        const { auditRunID } = req.data;
+        const tx = cds.transaction(req);
+
+        try {
+            const auditRun = await tx.run(
+                SELECT.one.from('AuditRuns').where({ ID: auditRunID })
+            );
+
+            if (!auditRun) {
+                req.error(404, `Audit run ${auditRunID} not found`);
+                return;
+            }
+
+            const activeRun = this.activeRuns?.get(auditRunID);
+
+            // Calculate progress based on actual data if audit is running
+            let progress = activeRun?.progress || 0;
+            let currentPhase = activeRun?.message || 'Idle';
+            
+            // If audit is running, calculate progress from actual counts
+            if (auditRun.status === 'RUNNING') {
+                let totalGroups = auditRun.groupsProcessed || 0;
+                let totalMembers = auditRun.membershipsProcessed || 0;
+                let totalRoles = auditRun.rolesProcessed || 0;
+                
+                // Estimate progress based on what's been processed
+                if (auditRun.mode === 'SAMPLE') {
+                    const targetGroups = auditRun.sampleGroupSize || 5;
+                    const targetMembers = auditRun.sampleMemberSize || 10;
+                    const targetRoles = auditRun.sampleRoleSize || 3;
+                    const totalTarget = targetGroups + targetMembers + targetRoles;
+                    const processed = totalGroups + totalMembers + totalRoles;
+                    progress = totalTarget > 0 ? Math.min(Math.floor((processed / totalTarget) * 100), 99) : 0;
+                } else {
+                    // For FULL mode, progress is based on phases
+                    progress = activeRun?.progress || 0;
+                }
+            }
+
+            return {
+                status: auditRun.status,
+                progress: progress,
+                currentPhase: currentPhase,
+                message: currentPhase,
+                groupCount: auditRun.groupsProcessed || 0,
+                userCount: auditRun.membershipsProcessed || 0,
+                roleCount: auditRun.rolesProcessed || 0,
+                memberCount: 0,
+                startTime: auditRun.startTime,
+                endTime: auditRun.endTime,
+                errorMessage: auditRun.errorMessage
+            };
+
+        } catch (error) {
+            req.error(500, error.message);
+        }
+    });
+
     // ============================
     // LIST AUDIT RUNS
     // ============================
@@ -315,41 +366,6 @@ this.on('getUsers', async (req) => {
     });
 
     // ============================
-    // GET AUDIT STATUS
-    // ============================
-    this.on('getAuditStatus', async (req) => {
-        const { auditRunID } = req.data;
-        const tx = cds.transaction(req);
-
-        try {
-            const auditRun = await tx.run(
-                SELECT.one.from('AuditRuns').where({ ID: auditRunID })
-            );
-
-            if (!auditRun) {
-                req.error(404, `Audit run ${auditRunID} not found`);
-                return;
-            }
-
-            const activeRun = this.activeRuns?.get(auditRunID);
-
-            return {
-                status: auditRun.status,
-                progress: activeRun?.progress || 0,
-                currentPhase: activeRun?.message || 'Idle',
-                message: activeRun?.message || '',
-                groupCount: auditRun.groupsProcessed || 0,
-                userCount: auditRun.membershipsProcessed || 0,
-                roleCount: auditRun.rolesProcessed || 0,
-                memberCount: 0
-            };
-
-        } catch (error) {
-            req.error(500, error.message);
-        }
-    });
-
-    // ============================
     // DELETE AUDIT RUN
     // ============================
     this.on('deleteAuditRun', async (req) => {
@@ -359,14 +375,12 @@ this.on('getUsers', async (req) => {
         try {
             await tx.begin();
 
-            // Delete related records
             await tx.run(DELETE.from('GroupMembers').where({ auditRunID_ID: auditRunID }));
             await tx.run(DELETE.from('Groups').where({ auditRunID_ID: auditRunID }));
             await tx.run(DELETE.from('Roles').where({ auditRunID_ID: auditRunID }));
             await tx.run(DELETE.from('MultiGroupUsers').where({ auditRunID_ID: auditRunID }));
             await tx.run(DELETE.from('UnusedRoles').where({ auditRunID_ID: auditRunID }));
             await tx.run(DELETE.from('ExecutiveSummary').where({ auditRunID_ID: auditRunID }));
-
             await tx.run(DELETE.from('AuditRuns').where({ ID: auditRunID }));
 
             await tx.commit();
@@ -407,25 +421,16 @@ this.on('getUsers', async (req) => {
     });
 
     // ============================
-    // AFTER CREATE - Audit Runs
+    // AFTER CREATE - Audit Runs (No auto-audit)
     // ============================
     this.after('CREATE', 'AuditRuns', async (data, req) => {
-        setImmediate(() => {
-            _runAuditAsync.call(this, data.ID, {
-                mode: data.mode,
-                extractGroups: data.extractGroups,
-                extractRoles: data.extractRoles,
-                sampleGroupSize: data.sampleGroupSize,
-                sampleMemberSize: data.sampleMemberSize,
-                sampleRoleSize: data.sampleRoleSize
-            }).catch(err => {
-                logger.error({ auditRunID: data.ID, error: err.message }, 'Background audit failed');
-            });
-        });
+        logger.info({ auditRunID: data.ID, name: data.name }, 
+            'Audit run created. Use runAudit action to start execution.');
+        // Do nothing - audit will not run automatically
     });
 
     // ============================
-    // MAIN BACKGROUND JOB
+    // MAIN BACKGROUND JOB with Continuous Status Updates
     // ============================
     async function _runAuditAsync(auditRunID, config) {
         const auditLogger = logger.child({ auditRunID, phase: 'AUDIT' });
@@ -448,39 +453,56 @@ this.on('getUsers', async (req) => {
                 id: auditRunID,
                 cancelled: false,
                 progress: 0,
-                message: 'Starting audit...'
+                message: 'Initializing...',
+                startTime: startTime
             };
             this.activeRuns.set(auditRunID, activeRun);
 
             const sfConfig = await _getSFDestination(auditLogger);
 
-            // PHASE 1: User Sync
+            // PHASE 1: User Sync (10%)
             activeRun.message = 'Checking user sync status...';
+            activeRun.progress = 5;
+            this.activeRuns.set(auditRunID, activeRun);
+            
             const auditRun = await tx.run(SELECT.one.from('AuditRuns').where({ ID: auditRunID }));
 
             if (auditRun.userSyncRequired && !auditRun.userSyncCompleted) {
                 auditLogger.info('User sync required - fetching from SF');
+                activeRun.message = 'Fetching users from SuccessFactors...';
+                activeRun.progress = 8;
+                this.activeRuns.set(auditRunID, activeRun);
+                
                 const users = await _fetchAllUsers(sfConfig, auditLogger);
+                
+                activeRun.message = 'Saving users to database...';
+                activeRun.progress = 9;
+                this.activeRuns.set(auditRunID, activeRun);
+                
                 await _upsertUsers(tx, users, auditLogger);
                 await tx.run(
                     UPDATE('AuditRuns')
                         .set({ userSyncCompleted: true, userSyncAt: new Date() })
                         .where({ ID: auditRunID })
                 );
+                
                 activeRun.progress = 10;
                 auditLogger.info({ userCount: users.length }, 'Users synced successfully');
             } else {
                 activeRun.progress = 10;
             }
+            this.activeRuns.set(auditRunID, activeRun);
 
-            // PHASE 2: Groups
+            // PHASE 2: Groups (10% - 30%)
             let groupStats = { static: 0, dynamic: 0, total: 0 };
             let memberStats = { membershipsProcessed: 0 };
 
             if (config.extractGroups) {
                 auditLogger.info('Starting group extraction');
-                activeRun.message = 'Extracting groups...';
-
+                activeRun.message = 'Fetching static groups...';
+                activeRun.progress = 15;
+                this.activeRuns.set(auditRunID, activeRun);
+                
                 const [staticGroups, dynamicGroups] = await Promise.all([
                     _fetchGroupsWithPagination(sfConfig, true, auditLogger),
                     _fetchGroupsWithPagination(sfConfig, false, auditLogger)
@@ -492,13 +514,21 @@ this.on('getUsers', async (req) => {
                     total: staticGroups.length + dynamicGroups.length
                 };
 
+                activeRun.message = 'Saving groups to database...';
+                activeRun.progress = 20;
+                this.activeRuns.set(auditRunID, activeRun);
+                
                 await _saveGroups(tx, auditRunID, staticGroups, 'STATIC', auditLogger);
                 await _saveGroups(tx, auditRunID, dynamicGroups, 'DYNAMIC', auditLogger);
-                activeRun.progress = 30;
+                
+                activeRun.progress = 25;
+                this.activeRuns.set(auditRunID, activeRun);
 
-                // PHASE 3: Group Members
+                // PHASE 3: Group Members (30% - 60%)
                 auditLogger.info('Starting member extraction');
                 activeRun.message = 'Extracting group members...';
+                activeRun.progress = 35;
+                this.activeRuns.set(auditRunID, activeRun);
 
                 const allGroups = [...staticGroups, ...dynamicGroups];
                 let groupsToProcess = allGroups;
@@ -508,17 +538,37 @@ this.on('getUsers', async (req) => {
                     auditLogger.info({ original: allGroups.length, sampled: groupsToProcess.length }, 'Applied group sampling');
                 }
 
-                memberStats = await _fetchAndSaveMembers(tx, auditRunID, groupsToProcess, sfConfig, config, auditLogger);
+                // Process members with progress updates
+                const totalGroupsToProcess = groupsToProcess.length;
+                let processedGroups = 0;
+                
+                const memberStatsResult = await _fetchAndSaveMembersWithProgress(
+                    tx, auditRunID, groupsToProcess, sfConfig, config, auditLogger,
+                    (processed, total, message) => {
+                        processedGroups = processed;
+                        const progressPercent = 35 + Math.floor((processed / total) * 25);
+                        activeRun.progress = Math.min(progressPercent, 60);
+                        activeRun.message = message || `Processing group ${processed}/${total}...`;
+                        this.activeRuns.set(auditRunID, activeRun);
+                    }
+                );
+                
+                memberStats = memberStatsResult;
                 activeRun.progress = 60;
+                activeRun.message = 'Updating group statistics...';
+                this.activeRuns.set(auditRunID, activeRun);
+                
                 await _updateGroupStatistics(tx, auditRunID, auditLogger);
             }
 
-            // PHASE 4: Roles
+            // PHASE 4: Roles (60% - 80%)
             let rolesProcessed = 0;
             if (config.extractRoles) {
                 auditLogger.info('Starting role extraction');
-                activeRun.message = 'Extracting roles...';
-
+                activeRun.message = 'Fetching roles...';
+                activeRun.progress = 65;
+                this.activeRuns.set(auditRunID, activeRun);
+                
                 const roles = await _fetchRolesWithPagination(sfConfig, auditLogger);
                 let rolesToProcess = roles;
 
@@ -527,15 +577,28 @@ this.on('getUsers', async (req) => {
                     auditLogger.info({ original: roles.length, sampled: rolesToProcess.length }, 'Applied role sampling');
                 }
 
+                activeRun.message = `Saving ${rolesToProcess.length} roles...`;
+                activeRun.progress = 75;
+                this.activeRuns.set(auditRunID, activeRun);
+                
                 rolesProcessed = rolesToProcess.length;
                 await _saveRoles(tx, auditRunID, rolesToProcess, auditLogger);
+                
                 activeRun.progress = 80;
+                this.activeRuns.set(auditRunID, activeRun);
             }
 
-            // PHASE 5: Analytics
+            // PHASE 5: Analytics (80% - 100%)
             auditLogger.info('Generating analytics');
             activeRun.message = 'Generating analytics...';
+            activeRun.progress = 85;
+            this.activeRuns.set(auditRunID, activeRun);
+            
             await _generateAnalytics(tx, auditRunID, auditLogger);
+            
+            activeRun.message = 'Finalizing audit...';
+            activeRun.progress = 95;
+            this.activeRuns.set(auditRunID, activeRun);
 
             // COMPLETE
             const executionTime = Date.now() - startTime;
@@ -553,6 +616,10 @@ this.on('getUsers', async (req) => {
             );
 
             await tx.commit();
+            
+            activeRun.message = 'Audit completed successfully!';
+            activeRun.progress = 100;
+            this.activeRuns.set(auditRunID, activeRun);
 
             auditLogger.info({
                 executionTime: `${executionTime}ms`,
@@ -578,8 +645,18 @@ this.on('getUsers', async (req) => {
             } catch (dbError) {
                 auditLogger.error({ error: dbError.message }, 'Failed to update audit status');
             }
+            
+            const activeRun = this.activeRuns.get(auditRunID);
+            if (activeRun) {
+                activeRun.message = `Failed: ${error.message.substring(0, 100)}`;
+                this.activeRuns.set(auditRunID, activeRun);
+            }
+            
         } finally {
-            this.activeRuns.delete(auditRunID);
+            // Keep active run for a while to allow status queries
+            setTimeout(() => {
+                this.activeRuns.delete(auditRunID);
+            }, 30000);
         }
     }
 
@@ -588,38 +665,6 @@ this.on('getUsers', async (req) => {
     // ============================
 
     async function _getSFDestination(auditLogger) {
-        // 1. Try local destination (for development)
-        if (isLocal && localDestinations) {
-            const sfDest = localDestinations.find(d => d.name === 'successfactors');
-            if (sfDest) {
-                auditLogger.info({ url: sfDest.url, source: 'default-env.json' }, 'Using local destination');
-                let baseURL = sfDest.url;
-                if (!baseURL.endsWith('/')) baseURL = baseURL + '/';
-                return {
-                    baseURL: baseURL,
-                    auth: { username: sfDest.username, password: sfDest.password },
-                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-                    timeout: 30000
-                };
-            }
-        }
-
-        // 2. Try environment variables (for development)
-        if (isLocal && process.env.SF_BASE_URL && process.env.SF_USERNAME && process.env.SF_PASSWORD) {
-            auditLogger.info('Using environment variables for SF credentials');
-            let baseURL = process.env.SF_BASE_URL;
-            if (!baseURL.endsWith('/')) baseURL = baseURL + '/';
-            return {
-                baseURL: baseURL,
-                auth: { username: process.env.SF_USERNAME, password: process.env.SF_PASSWORD },
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-                timeout: 30000
-            };
-        }
-
-        // 3. Try BTP Destination Service (production)
         try {
             auditLogger.info('Attempting to get destination from BTP Destination Service');
             const destination = await getDestination({ destinationName: 'successfactors' });
@@ -683,7 +728,7 @@ this.on('getUsers', async (req) => {
         return users;
     }
 
-  async function _upsertUsers(tx, users, auditLogger) {
+   async function _upsertUsers(tx, users, auditLogger) {
     let inserted = 0;
     let updated = 0;
 
@@ -698,17 +743,6 @@ this.on('getUsers', async (req) => {
                 const existing = await tx.run(
                     SELECT.one.from('Users').where({ userId: user.userId })
                 );
-
-                // Log the user data for debugging (first few users only)
-                if (i === 0 && user.userId === batch[0]?.userId) {
-                    auditLogger.debug({ 
-                        userId: user.userId,
-                        hireDate: user.hireDate,
-                        terminationDate: user.terminationDate,
-                        lastModifiedDateTime: user.lastModifiedDateTime,
-                        lastSyncAt: user.lastSyncAt
-                    }, 'Sample user data');
-                }
 
                 const userData = {
                     userId: user.userId,
@@ -727,13 +761,19 @@ this.on('getUsers', async (req) => {
                 };
 
                 if (existing && existing.length > 0) {
+                    // UPDATE existing user
                     await tx.run(
                         UPDATE('Users')
                             .set(userData)
                             .where({ userId: user.userId })
                     );
                     updated++;
+                    // Log every 100 updates to avoid spam
+                    if (updated % 100 === 0) {
+                        auditLogger.debug({ updated }, 'Users updated so far');
+                    }
                 } else {
+                    // INSERT new user
                     await tx.run(
                         INSERT.into('Users').entries(userData)
                     );
@@ -741,17 +781,43 @@ this.on('getUsers', async (req) => {
                 }
 
             } catch (error) {
-                auditLogger.error({ 
-                    userId: user.userId, 
-                    error: error.message,
-                    stack: error.stack,
-                    userData: {
-                        userId: user.userId,
-                        hireDate: user.hireDate,
-                        terminationDate: user.terminationDate,
-                        lastModifiedDateTime: user.lastModifiedDateTime
+                // Check if it's a unique constraint violation (user already exists)
+                if (error.message.includes('unique constraint') || error.message.includes('already exists')) {
+                    // User already exists - try to update instead
+                    try {
+                        const userData = {
+                            userName: user.userName || '',
+                            firstName: user.firstName || '',
+                            lastName: user.lastName || '',
+                            status: user.status || 'active',
+                            email: user.email || '',
+                            hireDate: user.hireDate instanceof Date && !isNaN(user.hireDate) ? user.hireDate : null,
+                            terminationDate: user.terminationDate instanceof Date && !isNaN(user.terminationDate) ? user.terminationDate : null,
+                            lastModifiedDateTime: user.lastModifiedDateTime instanceof Date && !isNaN(user.lastModifiedDateTime) ? user.lastModifiedDateTime : new Date(),
+                            jobTitle: user.jobTitle || '',
+                            department: user.department || '',
+                            lastSyncAt: user.lastSyncAt instanceof Date && !isNaN(user.lastSyncAt) ? user.lastSyncAt : new Date(),
+                            isActive: user.isActive !== false
+                        };
+                        
+                        await tx.run(
+                            UPDATE('Users')
+                                .set(userData)
+                                .where({ userId: user.userId })
+                        );
+                        updated++;
+                    } catch (updateError) {
+                        auditLogger.error({ 
+                            userId: user.userId, 
+                            error: updateError.message
+                        }, 'Failed to update existing user');
                     }
-                }, 'Failed to upsert user');
+                } else {
+                    auditLogger.error({ 
+                        userId: user.userId, 
+                        error: error.message
+                    }, 'Failed to upsert user');
+                }
             }
         }
 
@@ -791,38 +857,36 @@ this.on('getUsers', async (req) => {
         return groups;
     }
 
- async function _saveGroups(tx, auditRunID, groups, groupType, auditLogger) {
-    if (!groups.length) return;
+    async function _saveGroups(tx, auditRunID, groups, groupType, auditLogger) {
+        if (!groups.length) return;
 
-    const entries = groups.map(g => ({
-        ID: uuidv4(),
-        auditRunID_ID: auditRunID,
-        groupID: String(g.groupID || g.id),
-        groupName: g.groupName || g.name,
-        groupType: groupType,
-        groupTypeInternal: g.groupTypeInternal || 'permission',
-        activeMembershipCount: g.activeMembershipCount || 0,
-        totalMemberCount: g.totalMemberCount || 0,
-        createdBy: g.createdBy || '',
-        lastModifiedDate: g.lastModifiedDate ? new Date(g.lastModifiedDate) : null
-    }));
+        const entries = groups.map(g => ({
+            ID: uuidv4(),
+            auditRunID_ID: auditRunID,
+            groupID: String(g.groupID || g.id),
+            groupName: g.groupName || g.name,
+            groupType: groupType,
+            groupTypeInternal: g.groupTypeInternal || 'permission',
+            activeMembershipCount: g.activeMembershipCount || 0,
+            totalMemberCount: g.totalMemberCount || 0,
+            createdBy: g.createdBy || '',
+            lastModifiedDate: g.lastModifiedDate ? new Date(g.lastModifiedDate) : null
+        }));
 
-    for (let i = 0; i < entries.length; i += BATCH_CONFIG.GROUP_BATCH_SIZE) {
-        const batch = entries.slice(i, i + BATCH_CONFIG.GROUP_BATCH_SIZE);
-        // Filter out entries with invalid dates
-        const validBatch = batch.filter(entry => {
-            // lastModifiedDate can be null - that's acceptable
-            if (entry.lastModifiedDate === null) return true;
-            // Check if it's a valid date
-            return !isNaN(entry.lastModifiedDate.getTime());
-        });
-        if (validBatch.length > 0) {
-            await tx.run(INSERT.into('Groups').entries(validBatch));
+        for (let i = 0; i < entries.length; i += BATCH_CONFIG.GROUP_BATCH_SIZE) {
+            const batch = entries.slice(i, i + BATCH_CONFIG.GROUP_BATCH_SIZE);
+            const validBatch = batch.filter(entry => {
+                if (entry.lastModifiedDate === null) return true;
+                return !isNaN(entry.lastModifiedDate.getTime());
+            });
+            if (validBatch.length > 0) {
+                await tx.run(INSERT.into('Groups').entries(validBatch));
+            }
         }
+        auditLogger.info({ groupType, count: entries.length }, 'Groups saved');
     }
-    auditLogger.info({ groupType, count: entries.length }, 'Groups saved');
-}
-    async function _fetchAndSaveMembers(tx, auditRunID, groups, sfConfig, config, auditLogger) {
+
+    async function _fetchAndSaveMembersWithProgress(tx, auditRunID, groups, sfConfig, config, auditLogger, progressCallback) {
         const memberships = new Map();
         let processedGroups = 0;
 
@@ -849,8 +913,8 @@ this.on('getUsers', async (req) => {
                         }
                     }
                     processedGroups++;
-                    if (processedGroups % 10 === 0) {
-                        auditLogger.info({ processed: processedGroups, total: groups.length }, 'Membership progress');
+                    if (progressCallback) {
+                        progressCallback(processedGroups, groups.length, `Extracting members from group ${processedGroups}/${groups.length}...`);
                     }
                 } catch (error) {
                     auditLogger.error({ groupID: group.groupID, error: error.message }, 'Failed to fetch group members');
@@ -860,6 +924,11 @@ this.on('getUsers', async (req) => {
         }
 
         auditLogger.info({ memberships: memberships.size }, 'Membership data collected');
+        
+        if (progressCallback) {
+            progressCallback(processedGroups, groups.length, 'Saving memberships to database...');
+        }
+        
         const membershipsSaved = await _saveMemberships(tx, auditRunID, Array.from(memberships.values()), auditLogger);
 
         return { membershipsProcessed: membershipsSaved };
@@ -899,40 +968,36 @@ this.on('getUsers', async (req) => {
         return [];
     }
 
-  async function _saveMemberships(tx, auditRunID, memberships, auditLogger) {
-    if (!memberships.length) return 0;
+    async function _saveMemberships(tx, auditRunID, memberships, auditLogger) {
+        if (!memberships.length) return 0;
 
-    // Get existing users from central Users table
-    const userIds = [...new Set(memberships.map(m => m.userId))];
-    const existingUsers = await tx.run(
-        SELECT.from('Users').where({ userId: { in: userIds } })
-    );
-    const existingUserIds = new Set(existingUsers.map(u => u.userId));
-    const validMemberships = memberships.filter(m => existingUserIds.has(m.userId));
+        const userIds = [...new Set(memberships.map(m => m.userId))];
+        const existingUsers = await tx.run(
+            SELECT.from('Users').where({ userId: { in: userIds } })
+        );
+        const existingUserIds = new Set(existingUsers.map(u => u.userId));
+        const validMemberships = memberships.filter(m => existingUserIds.has(m.userId));
 
-    const entries = validMemberships.map(m => ({
-        ID: uuidv4(),
-        auditRunID_ID: auditRunID,
-        groupID: m.groupID,
-        groupName: m.groupName,
-        userId: m.userId,
-        userName: m.userName
-    }));
+        const entries = validMemberships.map(m => ({
+            ID: uuidv4(),
+            auditRunID_ID: auditRunID,
+            groupID: m.groupID,
+            groupName: m.groupName,
+            userId: m.userId,
+            userName: m.userName
+        }));
 
-    // Delete existing memberships for this audit run
-    await tx.run(
-        DELETE.from('GroupMembers').where({ auditRunID_ID: auditRunID })
-    );
+        await tx.run(DELETE.from('GroupMembers').where({ auditRunID_ID: auditRunID }));
 
-    // Insert in batches
-    for (let i = 0; i < entries.length; i += BATCH_CONFIG.MEMBER_BATCH_SIZE) {
-        const batch = entries.slice(i, i + BATCH_CONFIG.MEMBER_BATCH_SIZE);
-        await tx.run(INSERT.into('GroupMembers').entries(batch));
+        for (let i = 0; i < entries.length; i += BATCH_CONFIG.MEMBER_BATCH_SIZE) {
+            const batch = entries.slice(i, i + BATCH_CONFIG.MEMBER_BATCH_SIZE);
+            await tx.run(INSERT.into('GroupMembers').entries(batch));
+        }
+
+        auditLogger.info({ count: entries.length }, 'Memberships saved');
+        return entries.length;
     }
 
-    auditLogger.info({ count: entries.length }, 'Memberships saved');
-    return entries.length;
-}
     async function _fetchRolesWithPagination(sfConfig, auditLogger) {
         const roles = [];
         let skip = 0;
@@ -959,167 +1024,159 @@ this.on('getUsers', async (req) => {
         return roles;
     }
 
-   async function _saveRoles(tx, auditRunID, roles, auditLogger) {
-    if (!roles.length) return;
+    async function _saveRoles(tx, auditRunID, roles, auditLogger) {
+        if (!roles.length) return;
 
-    const entries = roles.map(r => {
-        let lastModifiedDate = null;
-        if (r.lastModifiedDate) {
-            try {
-                lastModifiedDate = new Date(r.lastModifiedDate);
-                if (isNaN(lastModifiedDate.getTime())) {
+        const entries = roles.map(r => {
+            let lastModifiedDate = null;
+            if (r.lastModifiedDate) {
+                try {
+                    lastModifiedDate = new Date(r.lastModifiedDate);
+                    if (isNaN(lastModifiedDate.getTime())) lastModifiedDate = new Date();
+                } catch (e) {
                     lastModifiedDate = new Date();
                 }
-            } catch (e) {
-                lastModifiedDate = new Date();
             }
+            return {
+                ID: uuidv4(),
+                auditRunID_ID: auditRunID,
+                roleId: r.roleId || r.id,
+                roleName: r.roleName || r.name,
+                roleDesc: r.roleDesc || r.description || '',
+                roleType: r.roleType || 'standard',
+                userType: r.userType || 'user',
+                lastModifiedBy: r.lastModifiedBy || '',
+                lastModifiedDate: lastModifiedDate
+            };
+        });
+
+        for (let i = 0; i < entries.length; i += 500) {
+            const batch = entries.slice(i, i + 500);
+            await tx.run(INSERT.into('Roles').entries(batch));
         }
-        
-        return {
-            ID: uuidv4(),
-            auditRunID_ID: auditRunID,
-            roleId: r.roleId || r.id,
-            roleName: r.roleName || r.name,
-            roleDesc: r.roleDesc || r.description || '',
-            roleType: r.roleType || 'standard',
-            userType: r.userType || 'user',
-            lastModifiedBy: r.lastModifiedBy || '',
-            lastModifiedDate: lastModifiedDate
-        };
-    });
-
-    for (let i = 0; i < entries.length; i += 500) {
-        const batch = entries.slice(i, i + 500);
-        await tx.run(INSERT.into('Roles').entries(batch));
+        auditLogger.info({ count: entries.length }, 'Roles saved');
     }
-    auditLogger.info({ count: entries.length }, 'Roles saved');
-}
 
- async function _updateGroupStatistics(tx, auditRunID, auditLogger) {
-    try {
-        // Use correct column names from your CDS model
-        await tx.run(`
-            UPDATE sap_sf_audit_Groups 
-            SET activeMembershipCount = (
-                SELECT COUNT(*) 
-                FROM sap_sf_audit_GroupMembers 
-                WHERE GroupMembers.groupID = Groups.groupID 
-                AND GroupMembers.auditRunID_ID = ?
-            )
-            WHERE auditRunID_ID = ?
-        `, [auditRunID, auditRunID]);
-        
-        auditLogger.info('Group statistics updated successfully');
-    } catch (error) {
-        auditLogger.error({ error: error.message }, 'Failed to update group statistics');
-        throw error;
-    }
-}
-
-   async function _generateAnalytics(tx, auditRunID, auditLogger) {
-    try {
-        // User group count distribution - uses userId, groupID from GroupMembers
-        await tx.run(`
-            INSERT INTO sap_sf_audit_UserGroupCountDistribution (ID, auditRunID_ID, bucket, userCount)
-            SELECT 
-                lower(hex(randomblob(16))),
-                ?,
-                CASE 
-                    WHEN group_count = 1 THEN '1 group'
-                    WHEN group_count = 2 THEN '2 groups'
-                    WHEN group_count <= 4 THEN '3–4 groups'
-                    WHEN group_count <= 7 THEN '5–7 groups'
-                    ELSE '8+ groups'
-                END,
-                COUNT(*)
-            FROM (
-                SELECT userId, COUNT(*) as group_count
-                FROM sap_sf_audit_GroupMembers
+    async function _updateGroupStatistics(tx, auditRunID, auditLogger) {
+        try {
+            await tx.run(`
+                UPDATE sap_sf_audit_Groups 
+                SET activeMembershipCount = (
+                    SELECT COUNT(*) 
+                    FROM sap_sf_audit_GroupMembers 
+                    WHERE sap_sf_audit_GroupMembers.groupID = Groups.groupID 
+                    AND sap_sf_audit_GroupMembers.auditRunID_ID = ?
+                )
                 WHERE auditRunID_ID = ?
-                GROUP BY userId
-            )
-            GROUP BY bucket
-        `, [auditRunID, auditRunID]);
-        
-        // Multi-group users (risk analysis)
-        await tx.run(`
-            INSERT INTO sap_sf_audit_MultiGroupUsers (ID, auditRunID_ID, userId, userName, groupCount, groupNames, riskLevel, riskScore, riskCategory, recommendedAction)
-            SELECT 
-                lower(hex(randomblob(16))),
-                ?,
-                gm.userId,
-                u.userName,
-                COUNT(DISTINCT gm.groupID) as groupCount,
-                GROUP_CONCAT(DISTINCT gm.groupName, ', ') as groupNames,
-                CASE 
-                    WHEN COUNT(DISTINCT gm.groupID) >= 4 THEN 'High'
-                    WHEN COUNT(DISTINCT gm.groupID) >= 3 THEN 'Medium'
-                    ELSE 'Low'
-                END as riskLevel,
-                COUNT(DISTINCT gm.groupID) as riskScore,
-                CASE 
-                    WHEN COUNT(DISTINCT gm.groupID) >= 4 THEN 'High Risk'
-                    WHEN COUNT(DISTINCT gm.groupID) >= 3 THEN 'Medium Risk'
-                    ELSE 'Low Risk'
-                END as riskCategory,
-                CASE 
-                    WHEN COUNT(DISTINCT gm.groupID) >= 4 THEN 'Review access immediately'
-                    WHEN COUNT(DISTINCT gm.groupID) >= 3 THEN 'Review access'
-                    ELSE 'Monitor'
-                END as recommendedAction
-            FROM sap_sf_audit_GroupMembers gm
-            LEFT JOIN sap_sf_audit_Users u ON u.userId = gm.userId AND u.auditRunID_ID = ?
-            WHERE gm.auditRunID_ID = ?
-            GROUP BY gm.userId
-            HAVING COUNT(DISTINCT gm.groupID) > 1
-        `, [auditRunID, auditRunID, auditRunID, auditRunID]);
-        
-        // Group size distribution
-        await tx.run(`
-            INSERT INTO sap_sf_audit_GroupSizeDistribution (ID, auditRunID_ID, bucket, groupCount)
-            SELECT 
-                lower(hex(randomblob(16))),
-                ?,
-                CASE 
-                    WHEN totalMemberCount <= 5 THEN '1–5 members'
-                    WHEN totalMemberCount <= 20 THEN '6–20 members'
-                    WHEN totalMemberCount <= 50 THEN '21–50 members'
-                    WHEN totalMemberCount <= 100 THEN '51–100 members'
-                    ELSE '100+ members'
-                END,
-                COUNT(*)
-            FROM sap_sf_audit_Groups
-            WHERE auditRunID_ID = ?
-            GROUP BY 
-                CASE 
-                    WHEN totalMemberCount <= 5 THEN '1–5 members'
-                    WHEN totalMemberCount <= 20 THEN '6–20 members'
-                    WHEN totalMemberCount <= 50 THEN '21–50 members'
-                    WHEN totalMemberCount <= 100 THEN '51–100 members'
-                    ELSE '100+ members'
-                END
-        `, [auditRunID, auditRunID]);
-        
-        // Unused roles
-        await tx.run(`
-            INSERT INTO sap_sf_audit_UnusedRoles (ID, auditRunID_ID, roleId, roleName, recommendation)
-            SELECT 
-                lower(hex(randomblob(16))),
-                ?,
-                r.roleId,
-                r.roleName,
-                'Review / Decommission'
-            FROM sap_sf_audit_Roles r
-            LEFT JOIN sap_sf_audit_RoleTargetPopulations tp 
-                ON tp.roleId = r.roleId AND tp.auditRunID_ID = ?
-            WHERE r.auditRunID_ID = ? AND tp.ID IS NULL
-        `, [auditRunID, auditRunID, auditRunID]);
-        
-        auditLogger.info('Analytics generated successfully');
-        
-    } catch (error) {
-        auditLogger.error({ error: error.message }, 'Failed to generate analytics');
-        throw error;
+            `, [auditRunID, auditRunID]);
+            
+            auditLogger.info('Group statistics updated successfully');
+        } catch (error) {
+            auditLogger.error({ error: error.message }, 'Failed to update group statistics');
+            throw error;
+        }
     }
+
+    async function _generateAnalytics(tx, auditRunID, auditLogger) {
+        try {
+            await tx.run(`
+                INSERT INTO sap_sf_audit_UserGroupCountDistribution (ID, auditRunID_ID, bucket, userCount)
+                SELECT 
+                    lower(hex(randomblob(16))),
+                    ?,
+                    CASE 
+                        WHEN group_count = 1 THEN '1 group'
+                        WHEN group_count = 2 THEN '2 groups'
+                        WHEN group_count <= 4 THEN '3–4 groups'
+                        WHEN group_count <= 7 THEN '5–7 groups'
+                        ELSE '8+ groups'
+                    END,
+                    COUNT(*)
+                FROM (
+                    SELECT userId, COUNT(*) as group_count
+                    FROM sap_sf_audit_GroupMembers
+                    WHERE auditRunID_ID = ?
+                    GROUP BY userId
+                )
+                GROUP BY bucket
+            `, [auditRunID, auditRunID]);
+            
+            await tx.run(`
+                INSERT INTO sap_sf_audit_MultiGroupUsers (ID, auditRunID_ID, userId, userName, groupCount, groupNames, riskLevel, riskScore, riskCategory, recommendedAction)
+                SELECT 
+                    lower(hex(randomblob(16))),
+                    ?,
+                    gm.userId,
+                    u.userName,
+                    COUNT(DISTINCT gm.groupID) as groupCount,
+                    GROUP_CONCAT(DISTINCT gm.groupName, ', ') as groupNames,
+                    CASE 
+                        WHEN COUNT(DISTINCT gm.groupID) >= 4 THEN 'High'
+                        WHEN COUNT(DISTINCT gm.groupID) >= 3 THEN 'Medium'
+                        ELSE 'Low'
+                    END as riskLevel,
+                    COUNT(DISTINCT gm.groupID) as riskScore,
+                    CASE 
+                        WHEN COUNT(DISTINCT gm.groupID) >= 4 THEN 'High Risk'
+                        WHEN COUNT(DISTINCT gm.groupID) >= 3 THEN 'Medium Risk'
+                        ELSE 'Low Risk'
+                    END as riskCategory,
+                    CASE 
+                        WHEN COUNT(DISTINCT gm.groupID) >= 4 THEN 'Review access immediately'
+                        WHEN COUNT(DISTINCT gm.groupID) >= 3 THEN 'Review access'
+                        ELSE 'Monitor'
+                    END as recommendedAction
+                FROM sap_sf_audit_GroupMembers gm
+                LEFT JOIN sap_sf_audit_Users u ON u.userId = gm.userId AND u.auditRunID_ID = ?
+                WHERE gm.auditRunID_ID = ?
+                GROUP BY gm.userId
+                HAVING COUNT(DISTINCT gm.groupID) > 1
+            `, [auditRunID, auditRunID, auditRunID, auditRunID]);
+            
+            await tx.run(`
+                INSERT INTO sap_sf_audit_GroupSizeDistribution (ID, auditRunID_ID, bucket, groupCount)
+                SELECT 
+                    lower(hex(randomblob(16))),
+                    ?,
+                    CASE 
+                        WHEN totalMemberCount <= 5 THEN '1–5 members'
+                        WHEN totalMemberCount <= 20 THEN '6–20 members'
+                        WHEN totalMemberCount <= 50 THEN '21–50 members'
+                        WHEN totalMemberCount <= 100 THEN '51–100 members'
+                        ELSE '100+ members'
+                    END,
+                    COUNT(*)
+                FROM sap_sf_audit_Groups
+                WHERE auditRunID_ID = ?
+                GROUP BY 
+                    CASE 
+                        WHEN totalMemberCount <= 5 THEN '1–5 members'
+                        WHEN totalMemberCount <= 20 THEN '6–20 members'
+                        WHEN totalMemberCount <= 50 THEN '21–50 members'
+                        WHEN totalMemberCount <= 100 THEN '51–100 members'
+                        ELSE '100+ members'
+                    END
+            `, [auditRunID, auditRunID]);
+            
+            await tx.run(`
+                INSERT INTO sap_sf_audit_UnusedRoles (ID, auditRunID_ID, roleId, roleName, recommendation)
+                SELECT 
+                    lower(hex(randomblob(16))),
+                    ?,
+                    r.roleId,
+                    r.roleName,
+                    'Review / Decommission'
+                FROM sap_sf_audit_Roles r
+                LEFT JOIN sap_sf_audit_RoleTargetPopulations tp 
+                    ON tp.roleId = r.roleId AND tp.auditRunID_ID = ?
+                WHERE r.auditRunID_ID = ? AND tp.ID IS NULL
+            `, [auditRunID, auditRunID, auditRunID]);
+            
+            auditLogger.info('Analytics generated successfully');
+            
+        } catch (error) {
+            auditLogger.error({ error: error.message }, 'Failed to generate analytics');
+            throw error;
+        }
     }
 });

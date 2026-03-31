@@ -48,7 +48,8 @@ Content-Type: application/json
 }
 
 ### 2.4 Get Users from Reporting Service (this is an entity, so GET works)
-GET http://localhost:4004/SuccessFactorRBPReport/Users?$top=10GET http://localhost:4004/SuccessFactorRBPReport/Users?$top=10
+GET http://localhost:4004/SuccessFactorRBPReport/Users?$top=10
+
 
 ### ============================================
 ### 3. AUDIT RUNS - CREATE & LIST
