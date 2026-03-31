@@ -78,11 +78,12 @@ service AuditExecutionService @(path: '/SuccessFactorRBPAudit') {
     message: String(255);
   };
   
-  action listAuditRuns(
+// Change from function to action
+action listAuditRuns(
     status: String(20) default null,
     top: Integer default 50,
     skip: Integer default 0
-  ) returns array of {
+) returns array of {
     ID: UUID;
     name: String(255);
     description: String(1000);
@@ -94,7 +95,7 @@ service AuditExecutionService @(path: '/SuccessFactorRBPAudit') {
     groupCount: Integer;
     userCount: Integer;
     roleCount: Integer;
-  };
+};
    action runAudit(
     auditRunID: UUID
   ) returns {

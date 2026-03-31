@@ -2,7 +2,6 @@ using { sap.sf.audit as db } from '../db/schema';
 
 /**
  * Audit Reporting Service
- * Provides comprehensive reporting and analytics on audit data
  */
 service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     
@@ -13,15 +12,15 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
     entity GroupMembers as projection on db.GroupMembers;
     entity UserRoleMappings as projection on db.UserRoleMappings;
     entity MultiGroupUsers as projection on db.MultiGroupUsers;
-    entity InactiveUserAccess as projection on db.InactiveUserAccess;
     entity UnusedRoles as projection on db.UnusedRoles;
-    entity ExecutiveSummary as projection on db.ExecutiveSummary;
     
     // ============================================
-    // Dashboard & Summary Functions
+    // Actions (POST) - NOT functions (GET)
     // ============================================
     
-    function getRiskDashboard(auditRunID: UUID) returns {
+    action getRiskDashboard(
+        auditRunID: UUID
+    ) returns {
         auditInfo: {
             name: String(255);
             instance: String(20);
@@ -46,7 +45,9 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    function getExecutiveSummary(auditRunID: UUID) returns {
+    action getExecutiveSummary(
+        auditRunID: UUID
+    ) returns {
         auditInfo: {
             name: String(255);
             instance: String(20);
@@ -78,11 +79,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    // ============================================
-    // Group Analysis Functions
-    // ============================================
-    
-    function getGroupDetails(
+    action getGroupDetails(
         auditRunID: UUID,
         groupType: String(20) default null,
         minMembers: Integer default 0,
@@ -100,7 +97,9 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         lastModifiedDate: Timestamp;
     };
     
-    function getGroupSizeAnalysis(auditRunID: UUID) returns {
+    action getGroupSizeAnalysis(
+        auditRunID: UUID
+    ) returns {
         distribution: array of {
             sizeRange: String(50);
             groupCount: Integer;
@@ -126,11 +125,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    // ============================================
-    // User Analysis Functions
-    // ============================================
-    
-    function getUserDetails(
+    action getUserDetails(
         auditRunID: UUID,
         status: String(20) default null,
         minGroupCount: Integer default 0,
@@ -154,7 +149,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         riskLevel: String(20);
     };
     
-    function getUserAccessAnalysis(
+    action getUserAccessAnalysis(
         auditRunID: UUID,
         top: Integer default 20
     ) returns {
@@ -181,7 +176,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    function getHighRiskUsers(
+    action getHighRiskUsers(
         auditRunID: UUID,
         minRiskScore: Integer default 5,
         top: Integer default 100,
@@ -202,30 +197,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         isInactive: Boolean;
     };
     
-    function getInactiveUsersWithAccess(
-        auditRunID: UUID,
-        riskCategory: String(20) default null,
-        top: Integer default 100,
-        skip: Integer default 0
-    ) returns array of {
-        userName: String(255);
-        firstName: String(255);
-        lastName: String(255);
-        department: String(255);
-        status: String(20);
-        hireDate: Timestamp;
-        permissionGroups: String(5000);
-        groupCount: Integer;
-        riskScore: Integer;
-        riskCategory: String(20);
-        recommendedAction: String(255);
-    };
-    
-    // ============================================
-    // Role Analysis Functions
-    // ============================================
-    
-    function getRoleDetails(
+    action getRoleDetails(
         auditRunID: UUID,
         usageStatus: String(20) default null,
         top: Integer default 100,
@@ -243,7 +215,9 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         usageStatus: String(20);
     };
     
-    function getRoleCoverageAnalysis(auditRunID: UUID) returns {
+    action getRoleCoverageAnalysis(
+        auditRunID: UUID
+    ) returns {
         summary: {
             totalRoles: Integer;
             rolesWithTargets: Integer;
@@ -271,7 +245,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         };
     };
     
-    function getGroupRoleMatrix(
+    action getGroupRoleMatrix(
         auditRunID: UUID,
         top: Integer default 100,
         skip: Integer default 0
@@ -285,11 +259,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         source: String(50);
     };
     
-    // ============================================
-    // User-Role Mapping Functions
-    // ============================================
-    
-    function getUserRoleMatrix(
+    action getUserRoleMatrix(
         auditRunID: UUID,
         userName: String(255) default null,
         roleName: String(255) default null,
@@ -308,7 +278,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         assignedViaGroup: String(255);
     };
     
-    function getUsersByRole(
+    action getUsersByRole(
         auditRunID: UUID,
         roleId: String(100),
         top: Integer default 100,
@@ -323,7 +293,7 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         assignedViaGroup: String(255);
     };
     
-    function getRolesByUser(
+    action getRolesByUser(
         auditRunID: UUID,
         userName: String(255),
         top: Integer default 100,
@@ -335,16 +305,12 @@ service AuditReportingService @(path: '/SuccessFactorRBPReport') {
         assignedViaGroup: String(255);
     };
     
-    // ============================================
-    // Export Functions
-    // ============================================
-    
-    function exportAuditData(
+    action exportAuditData(
         auditRunID: UUID,
         format: String(20) default 'JSON'
     ) returns LargeBinary;
     
-    function exportReport(
+    action exportReport(
         auditRunID: UUID,
         reportType: String(50),
         format: String(20) default 'CSV'

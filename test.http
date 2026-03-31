@@ -1,14 +1,13 @@
 ### ============================================
-### SAP SuccessFactors RBP Audit Tool - Complete Test Suite
-### ============================================
-### Base URL: http://localhost:4004
-### ============================================
-
-### ============================================
-### 1. SERVICE DISCOVERY
+### CAPM BACKEND - FULL FUNCTIONALITY TEST
+### Audit Run ID: 352d30ba-d462-459d-9d38-e7f0fa256510
 ### ============================================
 
-### 1.1 Get Service Document
+### ============================================
+### PART 1: SERVICE DISCOVERY
+### ============================================
+
+### 1.1 Get Service Documents
 GET http://localhost:4004/
 
 ### 1.2 Get AuditExecutionService Metadata
@@ -18,54 +17,10 @@ GET http://localhost:4004/SuccessFactorRBPAudit/$metadata
 GET http://localhost:4004/SuccessFactorRBPReport/$metadata
 
 ### ============================================
-### 2. USER MANAGEMENT
+### PART 2: AUDIT RUNS MANAGEMENT
 ### ============================================
 
-### 2.1 Sync Users from SuccessFactors
-POST http://localhost:4004/SuccessFactorRBPAudit/syncUsers
-Content-Type: application/json
-
-{}
-
-### 2.2 Get Users (with pagination)
-POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
-Content-Type: application/json
-
-{
-    "top": 20,
-    "skip": 0,
-    "status": "active"
-}
-
-### 2.3 Search Users by Name
-POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
-Content-Type: application/json
-
-{
-    "search": "admin",
-    "top": 10,
-    "skip": 0
-}
-
-### 2.4 Search Users by Partial Name
-POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
-Content-Type: application/json
-
-{
-    "search": "singh",
-    "top": 10,
-    "skip": 0
-}
-
-### 2.4 Get Users from Reporting Service (this is an entity, so GET works)
-GET http://localhost:4004/SuccessFactorRBPReport/Users?$top=10
-
-
-### ============================================
-### 3. AUDIT RUNS - CREATE & LIST
-### ============================================
-
-### 3.1 Create Full Audit Run(date error)
+### 2.1 Create New Audit Run (FULL Mode)
 POST http://localhost:4004/SuccessFactorRBPAudit/AuditRuns
 Content-Type: application/json
 
@@ -80,12 +35,12 @@ Content-Type: application/json
     "sampleRoleSize": 0
 }
 
-### 3.2 Create Sample Audit Run (for testing) (date error)
+### 2.2 Create New Audit Run (SAMPLE Mode - Faster)
 POST http://localhost:4004/SuccessFactorRBPAudit/AuditRuns
 Content-Type: application/json
 
 {
-    "name": "Test Sample Audit",
+    "name": "Sample Test Audit",
     "description": "Sample audit for testing",
     "mode": "SAMPLE",
     "extractGroups": true,
@@ -95,268 +50,294 @@ Content-Type: application/json
     "sampleRoleSize": 3
 }
 
-### 3.3 Get All Audit Runs
+### 2.3 Get All Audit Runs
 GET http://localhost:4004/SuccessFactorRBPAudit/AuditRuns
 
-### 3.4 List Audit Runs (with filters)
-# @prompt status (optional: CREATED, RUNNING, COMPLETED, FAILED)
-GET http://localhost:4004/SuccessFactorRBPAudit/listAuditRuns?status=COMPLETED&top=10&skip=0
+### 2.4 Get Specific Audit Run
+GET http://localhost:4004/SuccessFactorRBPAudit/AuditRuns(352d30ba-d462-459d-9d38-e7f0fa256510)
 
-### 3.5 Get Specific Audit Run by ID
-# @prompt auditRunID
-GET http://localhost:4004/SuccessFactorRBPAudit/AuditRuns({{auditRunID}})
+### 2.5 List Audit Runs with Filter (POST)
+POST http://localhost:4004/SuccessFactorRBPAudit/listAuditRuns
+Content-Type: application/json
 
-### ============================================
-### 4. AUDIT STATUS & MONITORING
-### ============================================
+{
+    "status": "COMPLETED",
+    "top": 10,
+    "skip": 0
+}
 
-### 4.1 Get Audit Status(not working)
-# @prompt auditRunID
+### 2.6 Get Audit Status
 POST http://localhost:4004/SuccessFactorRBPAudit/getAuditStatus
 Content-Type: application/json
 
 {
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510"
+}
+
+### 2.7 Start Audit Manually (Use ID from 2.1)
+# @prompt auditRunID
+POST http://localhost:4004/SuccessFactorRBPAudit/runAudit
+Content-Type: application/json
+
+{
     "auditRunID": "{{auditRunID}}"
 }
 
-
-### 4.2 Wait for audit to complete (check every 5 seconds)
-# Use the status from above to check progress
-
 ### ============================================
-### 5. GROUP ANALYSIS
+### PART 3: USER MANAGEMENT
 ### ============================================
 
-### 5.1 Get All Groups
-# @prompt auditRunID
-GET http://localhost:4004/SuccessFactorRBPReport/Groups?$filter=auditRunID_ID eq {{auditRunID}}&$top=20
+### 3.1 Sync Users from SuccessFactors
+POST http://localhost:4004/SuccessFactorRBPAudit/syncUsers
+Content-Type: application/json
 
-### 5.2 Get Static Groups
-GET http://localhost:4004/SuccessFactorRBPReport/Groups?$filter=groupType eq 'STATIC'&$top=20
+{}
 
-### 5.3 Get Dynamic Groups
-GET http://localhost:4004/SuccessFactorRBPReport/Groups?$filter=groupType eq 'DYNAMIC'&$top=20
+### 3.2 Get Users with Pagination
+POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
+Content-Type: application/json
 
-### 5.4 Get Group Details (with metrics)
-# @prompt auditRunID
+{
+    "top": 20,
+    "skip": 0,
+    "status": "active"
+}
+
+### 3.3 Search Users by Name
+POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
+Content-Type: application/json
+
+{
+    "search": "admin",
+    "top": 10,
+    "skip": 0
+}
+
+### 3.4 Get Users from Reporting Service (Entity)
+GET http://localhost:4004/SuccessFactorRBPReport/Users?$top=10
+
+### 3.5 Get Users Count
+GET http://localhost:4004/SuccessFactorRBPReport/Users/$count
+
+### ============================================
+### PART 4: GROUPS
+### ============================================
+
+### 4.1 Get All Groups
+GET http://localhost:4004/SuccessFactorRBPReport/Groups?$top=20
+
+### 4.2 Get Static Groups
+GET http://localhost:4004/SuccessFactorRBPReport/Groups?$filter=groupType eq 'STATIC'
+
+### 4.3 Get Dynamic Groups
+GET http://localhost:4004/SuccessFactorRBPReport/Groups?$filter=groupType eq 'DYNAMIC'
+
+### 4.4 Get Large Groups (50+ members)
+GET http://localhost:4004/SuccessFactorRBPReport/Groups?$filter=totalMemberCount gt 50
+
+### 4.5 Get Groups Count
+GET http://localhost:4004/SuccessFactorRBPReport/Groups/$count
+
+### ============================================
+### PART 5: GROUP MEMBERSHIPS
+### ============================================
+
+### 5.1 Get Group Memberships
+GET http://localhost:4004/SuccessFactorRBPReport/GroupMembers?$top=50
+
+### 5.2 Get Memberships Count
+GET http://localhost:4004/SuccessFactorRBPReport/GroupMembers/$count
+
+### 5.3 Get Members of Specific Group
+# @prompt groupID
+GET http://localhost:4004/SuccessFactorRBPReport/GroupMembers?$filter=groupID eq '{{groupID}}'&$top=20
+
+### ============================================
+### PART 6: ROLES
+### ============================================
+
+### 6.1 Get All Roles
+GET http://localhost:4004/SuccessFactorRBPReport/Roles?$top=20
+
+### 6.2 Get Roles Count
+GET http://localhost:4004/SuccessFactorRBPReport/Roles/$count
+
+### 6.3 Get Unused Roles
+GET http://localhost:4004/SuccessFactorRBPReport/UnusedRoles?$filter=auditRunID_ID eq 352d30ba-d462-459d-9d38-e7f0fa256510
+
+### ============================================
+### PART 7: ANALYTICS - MULTI-GROUP USERS (Risk Analysis)
+### ============================================
+
+### 7.1 Get All Multi-Group Users
+GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers?$top=50
+
+### 7.2 Get High Risk Users
+GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers?$filter=riskLevel eq 'High'&$top=20
+
+### 7.3 Get Multi-Group Users Count
+GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers/$count
+
+### ============================================
+### PART 8: REPORTING FUNCTIONS (POST)
+### ============================================
+
+### 8.1 Get Risk Dashboard
+POST http://localhost:4004/SuccessFactorRBPReport/getRiskDashboard
+Content-Type: application/json
+
+{
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510"
+}
+
+### 8.2 Get Executive Summary
+POST http://localhost:4004/SuccessFactorRBPReport/getExecutiveSummary
+Content-Type: application/json
+
+{
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510"
+}
+
+### 8.3 Get Group Details
 POST http://localhost:4004/SuccessFactorRBPReport/getGroupDetails
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
-    "groupType": null,
-    "minMembers": 0,
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "top": 20,
     "skip": 0
 }
 
-### 5.5 Get Group Size Analysis
-# @prompt auditRunID
+### 8.4 Get Group Size Analysis
 POST http://localhost:4004/SuccessFactorRBPReport/getGroupSizeAnalysis
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}"
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510"
 }
 
-### ============================================
-### 6. USER ACCESS ANALYSIS
-### ============================================
-
-### 6.1 Get User Details (with group counts)
-# @prompt auditRunID
+### 8.5 Get User Details
 POST http://localhost:4004/SuccessFactorRBPReport/getUserDetails
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "status": "active",
-    "minGroupCount": 0,
-    "department": null,
+    "minGroupCount": 3,
     "top": 20,
     "skip": 0
 }
 
-### 6.2 Get User Access Analysis
-# @prompt auditRunID
+### 8.6 Get User Access Analysis
 POST http://localhost:4004/SuccessFactorRBPReport/getUserAccessAnalysis
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "top": 20
 }
 
-### 6.3 Get High Risk Users
-# @prompt auditRunID
+### 8.7 Get High Risk Users (Detailed)
 POST http://localhost:4004/SuccessFactorRBPReport/getHighRiskUsers
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "minRiskScore": 5,
     "top": 20,
     "skip": 0
 }
 
-### 6.4 Get Inactive Users with Access
-# @prompt auditRunID
-POST http://localhost:4004/SuccessFactorRBPReport/getInactiveUsersWithAccess
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}",
-    "riskCategory": null,
-    "top": 20,
-    "skip": 0
-}
-
-### ============================================
-### 7. ROLE ANALYSIS
-### ============================================
-
-### 7.1 Get All Roles
-# @prompt auditRunID
-GET http://localhost:4004/SuccessFactorRBPReport/Roles?$filter=auditRunID_ID eq {{auditRunID}}&$top=20
-
-### 7.2 Get Role Details
-# @prompt auditRunID
+### 8.8 Get Role Details
 POST http://localhost:4004/SuccessFactorRBPReport/getRoleDetails
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
-    "usageStatus": null,
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "top": 20,
     "skip": 0
 }
 
-### 7.3 Get Role Coverage Analysis
-# @prompt auditRunID
+### 8.9 Get Role Coverage Analysis
 POST http://localhost:4004/SuccessFactorRBPReport/getRoleCoverageAnalysis
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}"
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510"
 }
 
-### 7.4 Get Unused Roles
-# @prompt auditRunID
-GET http://localhost:4004/SuccessFactorRBPReport/UnusedRoles?$filter=auditRunID_ID eq {{auditRunID}}
-
-### ============================================
-### 8. GROUP-ROLE MATRIX
-### ============================================
-
-### 8.1 Get Group-Role Matrix
-# @prompt auditRunID
+### 8.10 Get Group-Role Matrix
 POST http://localhost:4004/SuccessFactorRBPReport/getGroupRoleMatrix
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "top": 50,
     "skip": 0
 }
 
-### ============================================
-### 9. USER-ROLE MAPPINGS
-### ============================================
-
-### 9.1 Get All User-Role Mappings
-# @prompt auditRunID
-GET http://localhost:4004/SuccessFactorRBPReport/UserRoleMappings?$filter=auditRunID_ID eq {{auditRunID}}&$top=20
-
-### 9.2 Get User-Role Matrix
-# @prompt auditRunID
+### 8.11 Get User-Role Matrix
 POST http://localhost:4004/SuccessFactorRBPReport/getUserRoleMatrix
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
-    "userName": null,
-    "roleName": null,
-    "department": null,
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "top": 50,
     "skip": 0
 }
 
-### 9.3 Get Users by Role
-# @prompt auditRunID
+### 8.12 Get Users by Role
 # @prompt roleId
 POST http://localhost:4004/SuccessFactorRBPReport/getUsersByRole
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "roleId": "{{roleId}}",
-    "top": 50,
+    "top": 20,
     "skip": 0
 }
 
-### 9.4 Get Roles by User
-# @prompt auditRunID
+### 8.13 Get Roles by User
 # @prompt userName
 POST http://localhost:4004/SuccessFactorRBPReport/getRolesByUser
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}",
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
     "userName": "{{userName}}",
-    "top": 50,
+    "top": 20,
     "skip": 0
 }
 
 ### ============================================
-### 10. RISK DASHBOARD & EXECUTIVE SUMMARY
+### PART 9: EXPORT FUNCTIONS
 ### ============================================
 
-### 10.1 Get Risk Dashboard
-# @prompt auditRunID
-POST http://localhost:4004/SuccessFactorRBPReport/getRiskDashboard
+### 9.1 Export Full Audit Data (JSON)
+POST http://localhost:4004/SuccessFactorRBPReport/exportAuditData
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}"
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
+    "format": "JSON"
 }
 
-### 10.2 Get Executive Summary
-# @prompt auditRunID
-POST http://localhost:4004/SuccessFactorRBPReport/getExecutiveSummary
+### 9.2 Export Specific Report (CSV)
+POST http://localhost:4004/SuccessFactorRBPReport/exportReport
 Content-Type: application/json
 
 {
-    "auditRunID": "{{auditRunID}}"
+    "auditRunID": "352d30ba-d462-459d-9d38-e7f0fa256510",
+    "reportType": "groups",
+    "format": "CSV"
 }
 
 ### ============================================
-### 11. MULTI-GROUP USERS (Risk Analysis)
+### PART 10: DELETE & CLEANUP
 ### ============================================
 
-### 11.1 Get All Multi-Group Users
-# @prompt auditRunID
-GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers?$filter=auditRunID_ID eq {{auditRunID}}&$top=20
-
-### 11.2 Get High Risk Multi-Group Users
-GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers?$filter=riskLevel eq 'High'&$top=20
-
-### ============================================
-### 12. GROUP MEMBERSHIPS
-### ============================================
-
-### 12.1 Get All Group Members
-# @prompt auditRunID
-GET http://localhost:4004/SuccessFactorRBPReport/GroupMembers?$filter=auditRunID_ID eq {{auditRunID}}&$top=50
-
-### 12.2 Get Members of Specific Group
-# @prompt groupID
-GET http://localhost:4004/SuccessFactorRBPReport/GroupMembers?$filter=groupID eq '{{groupID}}'&$top=50
-
-### ============================================
-### 13. DELETE & CLEANUP
-### ============================================
-
-### 13.1 Delete Audit Run
+### 10.1 Delete Audit Run
 # @prompt auditRunID
 POST http://localhost:4004/SuccessFactorRBPAudit/deleteAuditRun
 Content-Type: application/json
@@ -366,80 +347,16 @@ Content-Type: application/json
 }
 
 ### ============================================
-### 14. EXPORT FUNCTIONS
+### QUICK TEST SEQUENCE (Run in Order)
 ### ============================================
 
-### 14.1 Export Full Audit Data
-# @prompt auditRunID
-POST http://localhost:4004/SuccessFactorRBPReport/exportAuditData
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}",
-    "format": "JSON"
-}
-
-### 14.2 Export Specific Report
-# @prompt auditRunID
-POST http://localhost:4004/SuccessFactorRBPReport/exportReport
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}",
-    "reportType": "groups",
-    "format": "CSV"
-}
-
-### ============================================
-### 15. BATCH REQUEST - Multiple Queries
-### ============================================
-
-POST http://localhost:4004/SuccessFactorRBPReport/$batch
-Content-Type: multipart/mixed; boundary=batch_123
-
---batch_123
-Content-Type: application/http
-Content-Transfer-Encoding: binary
-
-GET Groups?$top=5 HTTP/1.1
-Host: localhost:4004
-
-
---batch_123
-Content-Type: application/http
-Content-Transfer-Encoding: binary
-
-GET Users?$top=5 HTTP/1.1
-Host: localhost:4004
-
-
---batch_123
-Content-Type: application/http
-Content-Transfer-Encoding: binary
-
-GET Roles?$top=5 HTTP/1.1
-Host: localhost:4004
-
-
---batch_123--
-
-### ============================================
-### 16. QUICK TEST SEQUENCE
-### ============================================
-
-### Step 1: Sync Users (first run)
-POST http://localhost:4004/SuccessFactorRBPAudit/syncUsers
-Content-Type: application/json
-
-{}
-
-### Step 2: Create Sample Audit Run
+### Quick Test 1: Create Audit Run
 POST http://localhost:4004/SuccessFactorRBPAudit/AuditRuns
 Content-Type: application/json
 
 {
-    "name": "Quick Test Audit",
-    "description": "Quick test run",
+    "name": "Quick Test",
+    "description": "Quick verification test",
     "mode": "SAMPLE",
     "extractGroups": true,
     "extractRoles": true,
@@ -448,8 +365,16 @@ Content-Type: application/json
     "sampleRoleSize": 2
 }
 
-### Step 3: Get Audit Status (use the ID from Step 2)
+### Quick Test 2: Start Audit (Use ID from above)
 # @prompt auditRunID
+POST http://localhost:4004/SuccessFactorRBPAudit/runAudit
+Content-Type: application/json
+
+{
+    "auditRunID": "{{auditRunID}}"
+}
+
+### Quick Test 3: Check Status (Wait 10 seconds then run)
 POST http://localhost:4004/SuccessFactorRBPAudit/getAuditStatus
 Content-Type: application/json
 
@@ -457,100 +382,11 @@ Content-Type: application/json
     "auditRunID": "{{auditRunID}}"
 }
 
-### Step 4: Wait for COMPLETED status (check every 5 seconds)
-
-### Step 5: View Groups
-GET http://localhost:4004/SuccessFactorRBPReport/Groups?$top=10
-
-### Step 6: View Users
-GET http://localhost:4004/SuccessFactorRBPReport/Users?$top=10
-
-### Step 7: Get Risk Dashboard
-POST http://localhost:4004/SuccessFactorRBPReport/getRiskDashboard
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}"
-}
-
-### Step 8: Get Executive Summary
-POST http://localhost:4004/SuccessFactorRBPReport/getExecutiveSummary
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}"
-}
-
-### Step 9: Get High Risk Users
-POST http://localhost:4004/SuccessFactorRBPReport/getHighRiskUsers
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}",
-    "minRiskScore": 5,
-    "top": 10,
-    "skip": 0
-}
-
-### Step 10: Get Group Size Analysis
-POST http://localhost:4004/SuccessFactorRBPReport/getGroupSizeAnalysis
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}"
-}
-
-### Step 11: Get Role Coverage Analysis
-POST http://localhost:4004/SuccessFactorRBPReport/getRoleCoverageAnalysis
-Content-Type: application/json
-
-{
-    "auditRunID": "{{auditRunID}}"
-}
-
-### ============================================
-### 17. ADVANCED QUERIES
-### ============================================
-
-### 17.1 Get Groups with Member Count > 50
-GET http://localhost:4004/SuccessFactorRBPReport/Groups?$filter=totalMemberCount gt 50&$top=20
-
-### 17.2 Get Users with Risk Level High
-GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers?$filter=riskLevel eq 'High'&$expand=User
-
-### 17.3 Get Roles with No Target Population
-GET http://localhost:4004/SuccessFactorRBPReport/Roles?$expand=RoleTargetPopulations&$filter=RoleTargetPopulations/any(r: false)
-
-### 17.4 Get Group Members with User Details
-GET http://localhost:4004/SuccessFactorRBPReport/GroupMembers?$expand=User&$top=20
-
-### 17.5 Count Total Groups
-GET http://localhost:4004/SuccessFactorRBPReport/Groups/$count
-
-### 17.6 Count Total Users
-GET http://localhost:4004/SuccessFactorRBPReport/Users/$count
-
-### 17.7 Count High Risk Users
-GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers/$count?$filter=riskLevel eq 'High'
-
-### ============================================
-### 18. DEBUGGING ENDPOINTS
-### ============================================
-
-### 18.1 Check if Groups are loaded
+### Quick Test 4: View Groups
 GET http://localhost:4004/SuccessFactorRBPReport/Groups?$top=5
 
-### 18.2 Check if Users are loaded
+### Quick Test 5: View Users
 GET http://localhost:4004/SuccessFactorRBPReport/Users?$top=5
 
-### 18.3 Check if Roles are loaded
-GET http://localhost:4004/SuccessFactorRBPReport/Roles?$top=5
-
-### 18.4 Check if MultiGroupUsers are loaded
-GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers?$top=5
-
-### 18.5 Check if UnusedRoles are loaded
-GET http://localhost:4004/SuccessFactorRBPReport/UnusedRoles?$top=5
-
-### 18.6 Check Audit Execution Service
-GET http://localhost:4004/SuccessFactorRBPAudit/AuditRuns?$top=5
+### Quick Test 6: View High Risk Users
+GET http://localhost:4004/SuccessFactorRBPReport/MultiGroupUsers?$filter=riskLevel eq 'High'&$top=10
