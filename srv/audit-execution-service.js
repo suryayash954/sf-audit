@@ -145,62 +145,77 @@ module.exports = cds.service.impl(async function () {
         return formatted;
     }
 
-    // ============================
-    // GET USERS ACTION
-    // ============================
-    this.on('getUsers', async (req) => {
-        const { top = 100, skip = 0, status = null, search = null } = req.data;
+   // ============================
+// GET USERS ACTION (Simpler Version)
+// ============================
+this.on('getUsers', async (req) => {
+    const { top = 100, skip = 0, status = null, search = null } = req.data;
 
-        try {
-            const db = await cds.connect.to('db');
-            let query = SELECT.from('Users');
-            let conditions = [];
-            
-            if (status) conditions.push({ status: status });
-            if (search && search.trim()) {
-                const searchTerm = `%${search.trim()}%`;
-                conditions.push({
-                    or: [
-                        { userName: { like: searchTerm } },
-                        { firstName: { like: searchTerm } },
-                        { lastName: { like: searchTerm } },
-                        { email: { like: searchTerm } },
-                        { userId: { like: searchTerm } }
-                    ]
-                });
-            }
-            
-            if (conditions.length > 0) {
-                query = query.where(conditions.length === 1 ? conditions[0] : conditions);
-            }
-            
-            let countQuery = SELECT.from('Users').columns('count(*) as total');
-            if (conditions.length > 0) {
-                countQuery = countQuery.where(conditions.length === 1 ? conditions[0] : conditions);
-            }
-            
-            const countResult = await db.run(countQuery);
-            const total = countResult[0]?.total || 0;
-            
-            const users = await db.run(
-                query.orderBy('userName').limit(top, skip).columns([
-                    'userId', 'userName', 'firstName', 'lastName', 'status', 'email',
-                    'hireDate', 'jobTitle', 'department', 'lastModifiedDateTime'
-                ])
-            );
+    try {
+        const db = await cds.connect.to('db');
 
-            return {
-                success: true,
-                data: users,
-                pagination: { total, top, skip }
-            };
-
-        } catch (error) {
-            logger.error({ error: error.message }, 'Failed to get users');
-            req.error(500, `Failed to get users: ${error.message}`);
-            return { success: false, data: [], pagination: { total: 0, top, skip } };
+        // For complex searches, use raw SQL to avoid OR condition issues
+        let sql = `
+            SELECT 
+                userId, userName, firstName, lastName, status, email,
+                hireDate, jobTitle, department, lastModifiedDateTime
+            FROM sap_sf_audit_Users 
+            WHERE 1=1
+        `;
+        let countSql = `SELECT COUNT(*) as total FROM sap_sf_audit_Users WHERE 1=1`;
+        let params = [];
+        let countParams = [];
+        
+        if (status) {
+            sql += ` AND status = ?`;
+            countSql += ` AND status = ?`;
+            params.push(status);
+            countParams.push(status);
         }
-    });
+        
+        if (search && search.trim()) {
+            const searchTerm = `%${search.trim()}%`;
+            sql += ` AND (userName LIKE ? OR firstName LIKE ? OR lastName LIKE ? OR email LIKE ? OR userId LIKE ?)`;
+            countSql += ` AND (userName LIKE ? OR firstName LIKE ? OR lastName LIKE ? OR email LIKE ? OR userId LIKE ?)`;
+            params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+            countParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+        }
+        
+        // Get total count - access TOTAL column (uppercase)
+        const countResult = await db.run(countSql, countParams);
+        // Fix: Use TOTAL (uppercase) from HANA result
+        const total = countResult[0]?.TOTAL || 0;
+        
+        // Get paginated results
+        sql += ` ORDER BY userName LIMIT ? OFFSET ?`;
+        params.push(top, skip);
+        
+        const users = await db.run(sql, params);
+
+        return {
+            success: true,
+            data: users,
+            pagination: {
+                total: total,
+                top: top,
+                skip: skip
+            }
+        };
+
+    } catch (error) {
+        logger.error({ error: error.message, stack: error.stack }, 'Failed to get users');
+        req.error(500, `Failed to get users: ${error.message}`);
+        return {
+            success: false,
+            data: [],
+            pagination: {
+                total: 0,
+                top: top,
+                skip: skip
+            }
+        };
+    }
+});
 
     // ============================
     // RUN AUDIT ACTION (Manual trigger)

@@ -27,7 +27,7 @@ Content-Type: application/json
 
 {}
 
-### 2.2 Get Users (with pagination) - FIXED: Use POST
+### 2.2 Get Users (with pagination)
 POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
 Content-Type: application/json
 
@@ -37,12 +37,22 @@ Content-Type: application/json
     "status": "active"
 }
 
-### 2.3 Search Users by Name - FIXED: Use POST(issue)
+### 2.3 Search Users by Name
 POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
 Content-Type: application/json
 
 {
     "search": "admin",
+    "top": 10,
+    "skip": 0
+}
+
+### 2.4 Search Users by Partial Name
+POST http://localhost:4004/SuccessFactorRBPAudit/getUsers
+Content-Type: application/json
+
+{
+    "search": "singh",
     "top": 10,
     "skip": 0
 }
@@ -100,7 +110,7 @@ GET http://localhost:4004/SuccessFactorRBPAudit/AuditRuns({{auditRunID}})
 ### 4. AUDIT STATUS & MONITORING
 ### ============================================
 
-### 4.1 Get Audit Status
+### 4.1 Get Audit Status(not working)
 # @prompt auditRunID
 POST http://localhost:4004/SuccessFactorRBPAudit/getAuditStatus
 Content-Type: application/json
@@ -108,6 +118,7 @@ Content-Type: application/json
 {
     "auditRunID": "{{auditRunID}}"
 }
+
 
 ### 4.2 Wait for audit to complete (check every 5 seconds)
 # Use the status from above to check progress
